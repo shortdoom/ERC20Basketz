@@ -27,7 +27,7 @@ contract ercWrapper is ERC721{
 
     // Two options: Non-Fungible 721 (Transfer only whole amount), Fungible 1155 (Transfer parts). Second requires additional logic.
 
-    function wrapper(address[] memory tokens, uint256[] memory amounts) external returns(uint256) {
+    function wrapper(address[] memory tokens, uint256[] memory amounts) external returns (uint256) {
 
         for (uint256 i = 0; i < tokens.length; i++) {
             bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
@@ -43,9 +43,12 @@ contract ercWrapper is ERC721{
         return wrapId;
     }
 
-    function unwrapper(uint256 _id, address _withdraw) external {
-        // Only owner of nft should be able to call and only to his address
-        // Contract has tokens
+    function unwrapper() external {
+        for (uint256 i = 0; i < wrapped[msg.sender].tokens.length; i++) {
+            IERC20(wrapped[msg.sender].tokens[i]).approve(address(this), wrapped[msg.sender].amounts[i]);
+            bool success = IERC20(wrapped[msg.sender].tokens[i]).transferFrom(address(this), msg.sender, wrapped[msg.sender].amounts[i]);
+            require(success);
+        }
     }
 
     function wrappedBalance() public view returns(uint256 id, address[] memory tokens, uint256[] memory amounts) {

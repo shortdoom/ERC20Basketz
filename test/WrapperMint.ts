@@ -58,6 +58,7 @@ describe("ErcWrapper", () => {
         console.log("No. of NFT wrapps in user account", userWrapperBalance.toString());
 
         const wrappedBalance = await userWrapper.wrappedBalance();
+        
         console.log(
             "NFT ID",
             wrappedBalance.id.toString(),
@@ -67,6 +68,12 @@ describe("ErcWrapper", () => {
             wrappedBalance.amounts.toString()
             );
 
+        await userWrapper.unwrapper();
+        console.log('Transfered');
+
+        const userTokenBalanceA_after = await TokenA.balanceOf(user1.address);
+        const userTokenBalanceB_after = await TokenB.balanceOf(user1.address);
+        console.log('Balance TokenA:', userTokenBalanceA_after.toString(), 'Balance TokenB:', userTokenBalanceB_after.toString());
 
     });
 
