@@ -11,6 +11,8 @@ import "@nomiclabs/hardhat-waffle";
 import "hardhat-typechain";
 import "solidity-coverage";
 
+import "hardhat-gas-reporter"
+
 const chainIds = {
   ganache: 1337,
   goerli: 5,
@@ -84,6 +86,10 @@ const config: HardhatUserConfig = {
     outDir: "typechain",
     target: "ethers-v5",
   },
+  gasReporter: {
+    currency: 'USD',
+    gasPrice: 100
+  }
 };
 
 export default config;

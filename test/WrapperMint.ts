@@ -36,55 +36,161 @@ describe("ErcWrapper", () => {
 
     });
 
-    it("Mint Basket", async function() {
-        // approve ErcWrapper (transferFrom)
-        // call wrapper()
+    it("Basic Mint Basket", async function() {
         const toSwap = ethers.utils.parseEther("20");
 
+        // Approve two tokens which will become NFT-Index
         const userTokenA = TokenA.connect(user1);
         await userTokenA.approve(ErcWrapper.address, toSwap);
-
         const userTokenB = TokenB.connect(user1);
         await userTokenB.approve(ErcWrapper.address, toSwap);
 
+        // Send to contract
         const userWrapper = ErcWrapper.connect(user1);
         await userWrapper.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);
 
+        // Check balance after sending (N - toSwap)
         const userTokenBalanceA = await TokenA.balanceOf(user1.address);
         const userTokenBalanceB = await TokenB.balanceOf(user1.address);
-        console.log('Balance TokenA:', userTokenBalanceA.toString(), 'Balance TokenB:', userTokenBalanceB.toString());
+        console.log('Balance after minting first Basket');
+        console.log('TokenA:', userTokenBalanceA.toString(), 'TokenB:', userTokenBalanceB.toString());
 
+        // Number of NFT-Indexes assigned to user account
         const userWrapperBalance = await userWrapper.balanceOf(user1.address);
-        console.log("No. of NFT wrapps in user account", userWrapperBalance.toString());
+        console.log("User1 owns:", userWrapperBalance.toString(), "Basket (should be 1)");
 
         const wrappedBalance = await userWrapper.wrappedBalance();
         
         console.log(
-            "NFT ID",
+            "Basket ID",
             wrappedBalance.id.toString(),
-            "\nNFT Tokens",
+            "\nBasket Tokens",
             wrappedBalance.tokens, 
-            "\nNFT Tokens Amounts",
+            "\nBasket Tokens amounts",
             wrappedBalance.amounts.toString()
             );
 
-        await userWrapper.unwrapper();
-        console.log('Transfered');
+        // Transfer Basket 1 from User1 to User2
+        console.log("Start TransferFrom");
+        await userWrapper.approve(user2.address, 1);
+        await userWrapper.transferFrom(user1.address, user2.address, 1);
 
-        const userTokenBalanceA_after = await TokenA.balanceOf(user1.address);
-        const userTokenBalanceB_after = await TokenB.balanceOf(user1.address);
-        console.log('Balance TokenA:', userTokenBalanceA_after.toString(), 'Balance TokenB:', userTokenBalanceB_after.toString());
+        // Check User2 Balance after transfer from User1
+        // PROBLEM, SHOULD OWN 1 BASKET NOW!
+        const userWrapper2 = ErcWrapper.connect(user2);
+        const userWrapperBalance2 = await userWrapper2.balanceOf(user2.address);
+        console.log('User2 owns: (should be 1)', userWrapperBalance2.toString(), "Basket");
+        console.log('User1 owns: (should be 0)', userWrapperBalance.toString(), "Basket");
+
+        // This checks mapping data only
+        const userNFTBalanceAfterTransfer = await userWrapper2.wrappedBalance();
+
+        console.log(
+            "\nUSER2 BASKET DATA (should be 1)\n",
+            "\nBasket ID",
+            userNFTBalanceAfterTransfer.id.toString(),
+            "\nBasket Tokens",
+            userNFTBalanceAfterTransfer.tokens, 
+            "\nBasket Tokens Amounts",
+            userNFTBalanceAfterTransfer.amounts.toString()
+            );
+        
+        // Check User1 Balance
+        const userNFTBalanceAfterTransferOriginal = await userWrapper.wrappedBalance();
+
+        console.log(
+            "\nUSER1 BASKET DATA (should be null)\n",
+            "\nBasket ID",
+            userNFTBalanceAfterTransferOriginal.id.toString(),
+            "\nBasket Tokens",
+            userNFTBalanceAfterTransferOriginal.tokens, 
+            "\nBasket Tokens Amounts",
+            userNFTBalanceAfterTransferOriginal.amounts.toString()
+            );
 
     });
 
-    it("Send Basket", async function() {
-        // user1 transfers wrapped nft to user2
-    });
+    // it("Transfer NFT from U1 to U2, remove from U1 account", async function() {
+    //     const toSwap = ethers.utils.parseEther("20");
 
-    it("Unwrapp Basket", async function() {
-        // user2 unwrapps and pays his addresses
-        // user1 shouldn't be able to do that
-    });
+    //     // Approve two tokens which will become NFT-Index
+    //     const userTokenA = TokenA.connect(user1);
+    //     await userTokenA.approve(ErcWrapper.address, toSwap);
+    //     const userTokenB = TokenB.connect(user1);
+    //     await userTokenB.approve(ErcWrapper.address, toSwap);
 
+    //     // Create Basket for User1
+    //     const userWrapper = ErcWrapper.connect(user1);
+    //     await userWrapper.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);
+
+    //     // Transfer Basket from User1 to User2
+    //     await userWrapper.approve(user2.address, 1);
+    //     await userWrapper.transferFrom(user1.address, user2.address, 1);
+
+    //     // Check User2 Balance
+    //     const userWrapper2 = ErcWrapper.connect(user2);
+    //     const userNFTBalanceAfterTransfer = await userWrapper2.wrappedBalance();
+
+    //     console.log(
+    //         "\nUSER2 NFT DATA\n",
+    //         "NFT ID",
+    //         userNFTBalanceAfterTransfer.id.toString(),
+    //         "\nNFT Tokens",
+    //         userNFTBalanceAfterTransfer.tokens, 
+    //         "\nNFT Tokens Amounts",
+    //         userNFTBalanceAfterTransfer.amounts.toString()
+    //         );
+        
+    //     // Check User1 Balance
+    //     const userNFTBalanceAfterTransferOriginal = await userWrapper.wrappedBalance();
+
+    //     console.log(
+    //         "\nUSER1 NFT DATA (should be null)\n",
+    //         "NFT ID",
+    //         userNFTBalanceAfterTransferOriginal.id.toString(),
+    //         "\nNFT Tokens",
+    //         userNFTBalanceAfterTransferOriginal.tokens, 
+    //         "\nNFT Tokens Amounts",
+    //         userNFTBalanceAfterTransferOriginal.amounts.toString()
+    //         );
+
+    // });
+
+    // it("Basic Unwrap of Basket", async function() {
+    //     const toSwap = ethers.utils.parseEther("20");
+
+    //     // Approve two tokens which will become NFT-Index
+    //     const userTokenA = TokenA.connect(user1);
+    //     await userTokenA.approve(ErcWrapper.address, toSwap);
+    //     const userTokenB = TokenB.connect(user1);
+    //     await userTokenB.approve(ErcWrapper.address, toSwap);
+
+    //     // Create Basket for User1
+    //     const userWrapper = ErcWrapper.connect(user1);
+    //     await userWrapper.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);
+
+    //     // Unwrap Basket of User1
+    //     await userWrapper.unwrapper();
+    //     console.log('Unwrapping!');
+
+    //     // Should be 100 Tokens (80+20)
+    //     const userTokenBalanceA_after = await TokenA.balanceOf(user1.address);
+    //     const userTokenBalanceB_after = await TokenB.balanceOf(user1.address);
+    //     console.log('Balance of TokenA after unwrapping:', userTokenBalanceA_after.toString(), 'Balance of TokenB after unwrapping:', userTokenBalanceB_after.toString());
+
+    //     const userNFTBalanceAfterTransfer = await userWrapper.wrappedBalance();
+
+    //     console.log(
+    //         "\nUSER1 NFT DATA\n",
+    //         "\nShould be null now!\n",
+    //         "NFT ID",
+    //         userNFTBalanceAfterTransfer.id.toString(),
+    //         "\nNFT Tokens",
+    //         userNFTBalanceAfterTransfer.tokens, 
+    //         "\nNFT Tokens Amounts",
+    //         userNFTBalanceAfterTransfer.amounts.toString()
+    //         );
+
+    // });
 });
   

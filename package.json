@@ -74,6 +74,7 @@
   "dependencies": {
     "@openzeppelin/contracts": "^3.4.1",
     "@uniswap/v2-periphery": "^1.1.0-beta.0",
+    "hardhat-gas-reporter": "^1.0.4",
     "solc": "0.8.1"
   }
 }
