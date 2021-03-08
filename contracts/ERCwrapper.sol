@@ -6,16 +6,13 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/utils/EnumerableMap.sol";
+import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
-contract ercWrapper is ERC721{
+contract ercWrapper is ERC721 {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Counters for Counters.Counter;
-    using EnumerableSet for EnumerableSet.UintSet;
-    using EnumerableMap for EnumerableMap.UintToAddressMap;
-
-    mapping (address => EnumerableSet.UintSet) private _holderTokens;
-    EnumerableMap.UintToAddressMap private _tokenOwners;
 
     Counters.Counter private _WrapIndex;
     
@@ -42,8 +39,8 @@ contract ercWrapper is ERC721{
         _WrapIndex.increment();            
         uint256 wrapId = _WrapIndex.current();
         wrapped[msg.sender] = UserIndex({id: wrapId, tokens: tokens, amounts: amounts});
-        _mint(msg.sender, wrapId);
-        _setTokenURI(wrapId, "NFT-Location"); // Additional URI data can go here
+        super._mint(msg.sender, wrapId);
+        // _setTokenURI(wrapId, "NFT-Location"); // Additional URI data can go here
 
         return wrapId;
     }
@@ -62,29 +59,16 @@ contract ercWrapper is ERC721{
         _burn(id);
     }
 
+    /**
+    Override ERC721 functions to keep track of global storage variables.
+    _transfer is modified to also remove user baskets upon change of ownership
+     */
     function _transfer(address from, address to, uint256 tokenId) internal override {
         require(ERC721.ownerOf(tokenId) == from, "ERC721: transfer of token that is not own"); // internal owner
         require(to != address(0), "ERC721: transfer to the zero address");
-
-        _beforeTokenTransfer(from, to, tokenId);
-        _approve(address(0), tokenId);
-
-        _holderTokens[from].remove(tokenId);
-        _holderTokens[to].add(tokenId);
-
-        // This works as intended
+        super._transfer(from, to, tokenId);
         wrapped[to] = wrapped[msg.sender];
         delete wrapped[msg.sender];
-
-        _tokenOwners.set(tokenId, to);
-
-        emit Transfer(from, to, tokenId);
-    }
-
-    // Override all neccessary methods, not only balanceOf (inherited contract still has access to private variables)
-    function balanceOf(address owner) public view override returns (uint256) {
-        require(owner != address(0), "ERC721: balance query for the zero address");
-        return _holderTokens[owner].length();
     }
 
     function wrappedBalance() public view returns(uint256 id, address[] memory tokens, uint256[] memory amounts) {

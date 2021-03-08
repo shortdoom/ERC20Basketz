@@ -76,11 +76,11 @@ describe("ErcWrapper", () => {
         await userWrapper.transferFrom(user1.address, user2.address, 1);
 
         // Check User2 Balance after transfer from User1
-        // PROBLEM, SHOULD OWN 1 BASKET NOW!
         const userWrapper2 = ErcWrapper.connect(user2);
         const userWrapperBalance2 = await userWrapper2.balanceOf(user2.address);
+        const user1WrapperBalanceAfter = await userWrapper.balanceOf(user1.address);
         console.log('User2 owns: (should be 1)', userWrapperBalance2.toString(), "Basket");
-        console.log('User1 owns: (should be 0)', userWrapperBalance.toString(), "Basket");
+        console.log('User1 owns: (should be 0)', user1WrapperBalanceAfter.toString(), "Basket");
 
         // This checks mapping data only
         const userNFTBalanceAfterTransfer = await userWrapper2.wrappedBalance();
