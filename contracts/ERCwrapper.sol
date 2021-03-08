@@ -39,7 +39,7 @@ contract ercWrapper is ERC721 {
         _WrapIndex.increment();            
         uint256 wrapId = _WrapIndex.current();
         wrapped[msg.sender] = UserIndex({id: wrapId, tokens: tokens, amounts: amounts});
-        super._mint(msg.sender, wrapId);
+        _mint(msg.sender, wrapId);
         // _setTokenURI(wrapId, "NFT-Location"); // Additional URI data can go here
 
         return wrapId;
@@ -67,8 +67,8 @@ contract ercWrapper is ERC721 {
         require(ERC721.ownerOf(tokenId) == from, "ERC721: transfer of token that is not own"); // internal owner
         require(to != address(0), "ERC721: transfer to the zero address");
         super._transfer(from, to, tokenId);
-        wrapped[to] = wrapped[msg.sender];
-        delete wrapped[msg.sender];
+        wrapped[to] = wrapped[msg.sender]; // Copy UserIndex (token balance) from msg.sender (owner) to `to` (receiver)
+        delete wrapped[msg.sender]; // delete UserIndex of original owner
     }
 
     function wrappedBalance() public view returns(uint256 id, address[] memory tokens, uint256[] memory amounts) {
