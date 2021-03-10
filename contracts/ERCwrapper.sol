@@ -17,6 +17,14 @@ contract ercWrapper is ERC721 {
     Counters.Counter private _WrapIndex;
 
     mapping(address => UserIndex) wrapped;
+    mapping(address => UserMap[]) mapped;
+
+    struct UserMap {
+        uint256 id;
+        address[] tokens;
+        uint256[] amounts;
+        bool wrapOwner;
+    }
 
     struct UserIndex {
         uint256 id;
@@ -34,6 +42,40 @@ contract ercWrapper is ERC721 {
 
     // Two options: Non-Fungible 721 (Transfer only whole amount), Fungible 1155 (Transfer parts). Second requires additional logic.
 
+    function wrapperMapping(address[] memory tokens, uint256[] memory amounts) external returns (uint256) {
+        for (uint256 i = 0; i < tokens.length; i++) {
+            bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
+            require(success);
+        }
+
+        _WrapIndex.increment();
+        uint256 wrapId = _WrapIndex.current();
+        mapped[msg.sender].push(UserMap({id: wrapId, tokens: tokens, amounts: amounts, wrapOwner: true}));
+        _mint(msg.sender, wrapId);
+        // _setTokenURI(wrapId, "NFT-Location"); // Additional URI data can go here
+
+        return wrapId;
+    }
+
+    function unwrapperMapping(uint256 _basketId) external onlyWrapOwner {
+        // Lets say msg.sender owns basketId 1 & 2, but wants to unwrap only 2
+        uint256 basketNo = ERC721.tokenOfOwnerByIndex(msg.sender, _basketId); // return given msg.sender basket
+
+        for (uint256 i = 0; i < mapped[msg.sender][_basketId].tokens.length; i++) {
+            IERC20(mapped[msg.sender][_basketId].tokens[i]).approve(address(this), mapped[msg.sender][_basketId].amounts[i]);
+            bool success =
+                IERC20(mapped[msg.sender][_basketId].tokens[i]).transferFrom(
+                    address(this),
+                    msg.sender,
+                    mapped[msg.sender][_basketId].amounts[i]
+                );
+            require(success);
+        }
+
+        delete mapped[msg.sender][_basketId];
+        _burn(basketNo);
+    }
+
     function wrapper(address[] memory tokens, uint256[] memory amounts) external returns (uint256) {
         for (uint256 i = 0; i < tokens.length; i++) {
             bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
@@ -49,11 +91,9 @@ contract ercWrapper is ERC721 {
         return wrapId;
     }
 
-    function unwrapper() external onlyWrapOwner {
-        // Only NFT current holder should be able to call this function
-        // tokenID should be an argument, because users can own more than 1 Basket
-        uint256 id = wrapped[msg.sender].id;
-
+    function unwrapper(uint256 _basketId) external onlyWrapOwner {
+        // Lets say msg.sender owns basketId 1 & 2, but wants to unwrap only 2
+        uint256 basketNo = ERC721.tokenOfOwnerByIndex(msg.sender, _basketId); // return given msg.sender basket
         for (uint256 i = 0; i < wrapped[msg.sender].tokens.length; i++) {
             IERC20(wrapped[msg.sender].tokens[i]).approve(address(this), wrapped[msg.sender].amounts[i]);
             bool success =
@@ -66,7 +106,7 @@ contract ercWrapper is ERC721 {
         }
 
         delete wrapped[msg.sender];
-        _burn(id);
+        _burn(basketNo);
     }
 
     /**
@@ -85,7 +125,7 @@ contract ercWrapper is ERC721 {
         delete wrapped[msg.sender]; // delete UserIndex of original owner
     }
 
-    function wrappedBalance()
+    function wrappedBalance(uint256 _tokenId)
         public
         view
         returns (
@@ -94,6 +134,7 @@ contract ercWrapper is ERC721 {
             uint256[] memory amounts
         )
     {
-        return (wrapped[msg.sender].id, wrapped[msg.sender].tokens, wrapped[msg.sender].amounts);
+        address owner = ERC721.ownerOf(_tokenId);
+        return (wrapped[owner].id, wrapped[owner].tokens, wrapped[owner].amounts);
     }
 }

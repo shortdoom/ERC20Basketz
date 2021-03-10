@@ -10,6 +10,7 @@ dist/
 lib/
 node_modules/
 typechain/
+.github
 
 # files
 *.env
