@@ -14,7 +14,7 @@ contract ercWrapper is ERC721 {
 
     Counters.Counter private _wrapID;
 
-    mapping(address => mapping (uint256 => UserIndex)) private wrapped; 
+    mapping(address => mapping(uint256 => UserIndex)) private wrapped;
 
     struct UserIndex {
         address[] tokens;
@@ -32,7 +32,7 @@ contract ercWrapper is ERC721 {
         // NOTE: Probably there is some better way to manage wrapId/tokenId
         _wrapID.increment();
         uint256 wrapId = _wrapID.current();
-        wrapped[msg.sender][wrapId] = UserIndex({tokens: tokens, amounts: amounts});
+        wrapped[msg.sender][wrapId] = UserIndex({ tokens: tokens, amounts: amounts });
         _mint(msg.sender, wrapId);
         // NOTE: URI. Maybe off-chain stats, lightweight analysis of basket price change etc.
 
@@ -42,7 +42,10 @@ contract ercWrapper is ERC721 {
     function unwrapper(uint256 _wrapId) external {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         for (uint256 i = 0; i < wrapped[msg.sender][_wrapId].tokens.length; i++) {
-            IERC20(wrapped[msg.sender][_wrapId].tokens[i]).approve(address(this), wrapped[msg.sender][_wrapId].amounts[i]);
+            IERC20(wrapped[msg.sender][_wrapId].tokens[i]).approve(
+                address(this),
+                wrapped[msg.sender][_wrapId].amounts[i]
+            );
             bool success =
                 IERC20(wrapped[msg.sender][_wrapId].tokens[i]).transferFrom(
                     address(this),
@@ -61,14 +64,14 @@ contract ercWrapper is ERC721 {
         address to,
         uint256 _wrapId
     ) internal override {
-        require(ERC721.ownerOf( _wrapId) == from, "ERC721: transfer of token that is not own"); // internal owner
-        require(to != address(0), "ERC721: transfer to the zero address");
-        super._transfer(from, to,  _wrapId);
-        wrapped[to][ _wrapId] = wrapped[msg.sender][ _wrapId]; // Copy UserIndex (token balance) from msg.sender (owner) to `to` (receiver)
-        delete wrapped[msg.sender][_wrapId]; // delete UserIndex of original owner
+        super._transfer(from, to, _wrapId);
+
+        // NOTE: Change Basket ownership with NFT transfer (token claim/unwrap)
+        wrapped[to][_wrapId] = wrapped[msg.sender][_wrapId];
+        delete wrapped[msg.sender][_wrapId];
     }
 
-    function wrappedBalance(uint256  _wrapId)
+    function wrappedBalance(uint256 _wrapId)
         public
         view
         returns (
@@ -77,8 +80,7 @@ contract ercWrapper is ERC721 {
             uint256[] memory amounts
         )
     {
-        address owner = ERC721.ownerOf( _wrapId);
-        return ( _wrapId, wrapped[owner][ _wrapId].tokens, wrapped[owner][ _wrapId].amounts);
+        address owner = ERC721.ownerOf(_wrapId);
+        return (_wrapId, wrapped[owner][_wrapId].tokens, wrapped[owner][_wrapId].amounts);
     }
-
 }
