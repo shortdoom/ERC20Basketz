@@ -17,6 +17,7 @@ describe("ErcWrapper", () => {
   let ErcWrapper: Contract;
   let TokenA: Contract;
   let TokenB: Contract;
+  let NotAllowedToken: Contract;
   let deployer: SignerWithAddress;
   let user1: SignerWithAddress;
   let user2: SignerWithAddress;
@@ -24,15 +25,18 @@ describe("ErcWrapper", () => {
   beforeEach(async () => {
     [deployer, user1, user2] = await ethers.getSigners();
 
-    const wrapperFactory = new ErcWrapper__factory(deployer);
-    ErcWrapper = await wrapperFactory.deploy();
-
     // Mint two tokens and send to user1 & user2
     const ERC20Factory = new ethers.ContractFactory(ERC20.abi, ERC20.bytecode, deployer);
     TokenA = await ERC20Factory.deploy(TOTALSUPPLY);
     TokenB = await ERC20Factory.deploy(TOTALSUPPLY);
+    NotAllowedToken = await ERC20Factory.deploy(TOTALSUPPLY);
     await TokenA.transfer(user1.address, ethers.utils.parseEther("100"));
     await TokenB.transfer(user1.address, ethers.utils.parseEther("100"));
+    await NotAllowedToken.transfer(user1.address, ethers.utils.parseEther("100"));
+
+    const wrapperFactory = new ErcWrapper__factory(deployer);
+    ErcWrapper = await wrapperFactory.deploy(TokenA.address, TokenB.address);
+
   });
 
   it("Basic Mint Basket", async function () {
