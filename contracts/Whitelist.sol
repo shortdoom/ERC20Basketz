@@ -15,9 +15,6 @@ contract Whitelist {
         address aaveFeed = 0x6Df09E975c830ECae5bd4eD9d90f3A95a4f88012;
         priceList[_aave] = aaveFeed;
 
-        // address grtFeed = 0x17D054eCac33D91F7340645341eFB5DE9009F1C1;
-        // priceList[_grtFeed] = grtFeed;
-
         address btcFeed = 0xdeb288F737066589598e9214E782fa5A8eD689e8;
         priceList[_btcFeed] = btcFeed;
     }

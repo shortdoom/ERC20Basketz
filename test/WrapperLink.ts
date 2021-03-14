@@ -17,7 +17,7 @@ describe("ErcWrapper", () => {
   let ErcWrapper: Contract;
   let TokenA: Contract;
   let TokenB: Contract;
-  let NotAllowedToken: Contract;
+  let NotListedToken: Contract;
   let deployer: SignerWithAddress;
   let user1: SignerWithAddress;
   let user2: SignerWithAddress;
@@ -29,10 +29,10 @@ describe("ErcWrapper", () => {
     const ERC20Factory = new ethers.ContractFactory(ERC20.abi, ERC20.bytecode, deployer);
     TokenA = await ERC20Factory.deploy(TOTALSUPPLY);
     TokenB = await ERC20Factory.deploy(TOTALSUPPLY);
-    NotAllowedToken = await ERC20Factory.deploy(TOTALSUPPLY);
+    NotListedToken = await ERC20Factory.deploy(TOTALSUPPLY);
     await TokenA.transfer(user1.address, ethers.utils.parseEther("100"));
     await TokenB.transfer(user1.address, ethers.utils.parseEther("100"));
-    await NotAllowedToken.transfer(user1.address, ethers.utils.parseEther("100"));
+    await NotListedToken.transfer(user1.address, ethers.utils.parseEther("100"));
 
     const wrapperFactory = new ErcWrapper__factory(deployer);
     ErcWrapper = await wrapperFactory.deploy(TokenA.address, TokenB.address);
@@ -47,7 +47,7 @@ describe("ErcWrapper", () => {
     await userTokenA.approve(ErcWrapper.address, toSwap);
     const userTokenB = TokenB.connect(user1);
     await userTokenB.approve(ErcWrapper.address, toSwap);
-    const NotAllowedToken = TokenB.connect(user1);
+    const NotAllowedToken = NotListedToken.connect(user1);
     await NotAllowedToken.approve(ErcWrapper.address, toSwap);
 
     // Send to contract
@@ -81,10 +81,24 @@ describe("ErcWrapper", () => {
 
     await userTokenB.approve(ErcWrapper.address, toSwap);
     await NotAllowedToken.approve(ErcWrapper.address, toSwap);
-    expect(await userWrapper.wrapper([TokenA.address, NotAllowedToken.address], [toSwap, toSwap])).to.be.reverted;
-    
+    // expect is wrong
+    await userWrapper.wrapper([TokenA.address, NotAllowedToken.address], [toSwap, toSwap]);
+
     console.log("Success! Token not allowed");
 
+    const userWrapperBalanceNew = await userWrapper.balanceOf(user1.address);
 
+    // This returns len
+    console.log("User1 owns:", userWrapperBalanceNew.toString(), "Basket (should be 1)");
+    const wrappedBalanceNew = await userWrapper.wrappedBalance(2);
+
+    console.log(
+      "Basket ID",
+      wrappedBalanceNew.id.toString(),
+      "\nBasket Tokens",
+      wrappedBalanceNew.tokens,
+      "\nBasket Tokens amounts",
+      wrappedBalanceNew.amounts.toString(),
+    );
   });
 });
