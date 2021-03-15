@@ -10,12 +10,30 @@ import "@chainlink/contracts/src/v0.6/interfaces/AggregatorV3Interface.sol";
 import "./Whitelist.sol";
 
 /**
+
 Basic functionality: Wrap & Unwrap ERC20 Baskets stored as NFT
 Extended basic functionality: Ability to Transfer ERC20 Baskets as NFT
-Feature: Sell Basket for ETH
+Feature: P2P exchange of Baskets / Buy-Sell Basket for ETH
 Extended feature: Stack NFT Basket for overcollaterized loan
-
 Chainlink role: Current value of the Basket
+ERC721 URI: Additional data which makes sense to calculate offchain (e.g volatility)
+
+Contract should be fully ERC721 capable.
+
+1) Users approves and sends tokens
+2) Contract checks if tokens are whitelisted for wrapping
+    2a) Function wrappedBackend is a placeholder for change of dev path and doing whitelisting offchain, considerations are above function definition
+3) User wrappedBalance incremented, NFT token coresponding to balance minted (mapping wrapped)
+4) User can unwrap NFT he owns back to his ERC20 tokens.
+5) User can transfer (trade*) NFT and ownership of claim on wrapped Tokens
+6) User can check balance of his basket
+7) Contract uses chainlink Ethereum Price Feeds to calculate value of the Basket (explains also limits on tokens in Basket)
+
+Current thoughts:
+1) Appropriate types for storage variables (price feeds & user balance)
+2) Access control to functions (currently require, limited modifiers)
+3) Loops avoidance
+4) Better construction of Whitelist
  */
 
 contract ercWrapper is ERC721, Whitelist {
@@ -41,15 +59,14 @@ contract ercWrapper is ERC721, Whitelist {
         _;
     }
 
-    constructor(address _aave, address _btcFeed) 
-        ERC721("WrappedIndex", "WRAP")
-        Whitelist(_aave, _btcFeed) {
-            backend = msg.sender;
-        }
+    constructor(address _aave, address _btcFeed) ERC721("WrappedIndex", "WRAP") Whitelist(_aave, _btcFeed) {
+        backend = msg.sender;
+    }
 
+    // :::::NOTE:::::
     // Onchain (can be expensive, at least one loop)
     // Off-chain (no longer permissionless, easier, cheaper)
-    // A perfect solution would be to allow ALL ERC20 and let market price it
+    // An ideal would be to allow ALL ERC20 and let market price it
     function wrapper(address[] memory tokens, uint256[] memory amounts) external returns (uint256) {
         uint256 basketSize = tokens.length;
         require(basketSize <= 10, "Maxiumum  Basket size allowed");
@@ -61,23 +78,23 @@ contract ercWrapper is ERC721, Whitelist {
 
         for (uint256 i = 0; i < tokens.length; i++) {
             bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
-            require(success, "Transfer failed");   
-  
+            require(success, "Transfer failed");
         }
+
         _wrapID.increment();
         uint256 wrapId = _wrapID.current();
         wrapped[msg.sender][wrapId] = UserIndex({ tokens: tokens, amounts: amounts, locked: false });
         _mint(msg.sender, wrapId);
-        // NOTE: URI. Maybe off-chain stats, lightweight analysis of basket price change etc.
+        // NOTE: URI. Maybe off-chain stats, lightweight analysis of basket price change, volatility grade, dashboard for portfolio etc.
 
         return wrapId;
     }
 
     function wrapperBackend(address[] memory tokens, uint256[] memory amounts) public backEnd returns (uint256) {
-        // No need to check, but introduces additional role of backEnd script
+        // NOTE: No need to check, but introduces additional role of backEnd script
         for (uint256 i = 0; i < tokens.length; i++) {
-                bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
-                require(success, "Transfer failed");   
+            bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
+            require(success, "Transfer failed");
         }
         _wrapID.increment();
         uint256 wrapId = _wrapID.current();
@@ -89,6 +106,7 @@ contract ercWrapper is ERC721, Whitelist {
     function unwrapper(uint256 _wrapId) external {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         require(wrapped[msg.sender][_wrapId].locked == false, "Cannot unwrap locked");
+
         for (uint256 i = 0; i < wrapped[msg.sender][_wrapId].tokens.length; i++) {
             IERC20(wrapped[msg.sender][_wrapId].tokens[i]).approve(
                 address(this),
@@ -127,6 +145,7 @@ contract ercWrapper is ERC721, Whitelist {
     }
 
     function priceBasket(uint256 _wrapId) public returns (uint256 basketPrice) {
+        // NOTE: Currently it returns only total price of Basket. Should also give access to individual.
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         uint256 total;
         for (uint256 i = 0; i < wrapped[msg.sender][_wrapId].tokens.length; i++) {
@@ -153,5 +172,10 @@ contract ercWrapper is ERC721, Whitelist {
     {
         address owner = ERC721.ownerOf(_wrapId);
         return (_wrapId, wrapped[owner][_wrapId].tokens, wrapped[owner][_wrapId].amounts);
+    }
+
+    function basketBalance(address owner, uint256 _wrapId) public view returns(uint256) {
+        // offer[msg.sender][_wrapId] = priceBasket(_wrapId);
+        return(offer[owner][_wrapId]);
     }
 }

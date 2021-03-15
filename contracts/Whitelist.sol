@@ -1,9 +1,16 @@
 pragma solidity 0.7.4;
 pragma experimental ABIEncoderV2;
 
+    /**
+    Whitelist should be initialized at deployment.
+    Constructor creates a list of available price feeds for chainlink.
+    This contract is only called in relation to chainlink feed.
+    https://docs.chain.link/docs/ethereum-addresses
+     */
+
 contract Whitelist {
 
-    mapping(address => address) private priceList; // This def stays, because we need to match neatly token<>pair
+    mapping(address => address) private priceList;
 
     constructor(
         address _aave,
@@ -24,6 +31,7 @@ contract Whitelist {
 
     function isAllowedLoop(address token) public view returns (bool) {
         // require(priceList[token] != address(0), "No Chainlink Price Feed");
+        // NOTE: This for sure can be done better :)
         if (priceList[token] != address(0)) {
             return(true);
         } else {
