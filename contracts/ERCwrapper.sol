@@ -26,6 +26,7 @@ contract ercWrapper is ERC721, Whitelist {
     Counters.Counter private _wrapID;
     AggregatorV3Interface internal priceFeed;
 
+    address private backend;
     mapping(address => mapping(uint256 => UserIndex)) private wrapped;
     mapping(address => mapping(uint256 => uint256)) private offer;
 
@@ -35,29 +36,53 @@ contract ercWrapper is ERC721, Whitelist {
         bool locked;
     }
 
+    modifier backEnd() {
+        require(msg.sender == backend, "Pre-checked whitelist tokens");
+        _;
+    }
+
     constructor(address _aave, address _btcFeed) 
         ERC721("WrappedIndex", "WRAP")
-        Whitelist(_aave, _btcFeed) {}
-
-    function wrapper(address[] memory tokens, uint256[] memory amounts) external returns (uint256) {
-        // Token Whitelist?
-        // NOTE: This function should check if token supplied is whitelisted
-        // Allow only tokens on whitelist (which LINK track TOKEN/WETH).
-        // if (tokens[i] == tokenWhitelist()) {
-        for (uint256 i = 0; i < tokens.length; i++) {
-            address allowed = getMember(tokens[i]);
-            if (tokens[i] == allowed) {
-                bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
-                require(success);                
-            }
+        Whitelist(_aave, _btcFeed) {
+            backend = msg.sender;
         }
 
+    // Onchain (can be expensive, at least one loop)
+    // Off-chain (no longer permissionless, easier, cheaper)
+    // A perfect solution would be to allow ALL ERC20 and let market price it
+    function wrapper(address[] memory tokens, uint256[] memory amounts) external returns (uint256) {
+        uint256 basketSize = tokens.length;
+        require(basketSize <= 10, "Maxiumum  Basket size allowed");
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            bool success = isAllowedLoop(tokens[i]);
+            require(success == true, "No Chainlink Price Feed Available");
+        }
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
+            require(success, "Transfer failed");   
+  
+        }
         _wrapID.increment();
         uint256 wrapId = _wrapID.current();
         wrapped[msg.sender][wrapId] = UserIndex({ tokens: tokens, amounts: amounts, locked: false });
         _mint(msg.sender, wrapId);
         // NOTE: URI. Maybe off-chain stats, lightweight analysis of basket price change etc.
 
+        return wrapId;
+    }
+
+    function wrapperBackend(address[] memory tokens, uint256[] memory amounts) public backEnd returns (uint256) {
+        // No need to check, but introduces additional role of backEnd script
+        for (uint256 i = 0; i < tokens.length; i++) {
+                bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
+                require(success, "Transfer failed");   
+        }
+        _wrapID.increment();
+        uint256 wrapId = _wrapID.current();
+        wrapped[msg.sender][wrapId] = UserIndex({ tokens: tokens, amounts: amounts, locked: false });
+        _mint(msg.sender, wrapId);
         return wrapId;
     }
 

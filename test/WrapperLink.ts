@@ -39,7 +39,7 @@ describe("ErcWrapper", () => {
 
   });
 
-  it("Wrapping only from allowed list", async function () {
+  it("Standard wrapping", async function () {
     const toSwap = ethers.utils.parseEther("20");
 
     // Approve two tokens which will become NFT-Index
@@ -77,28 +77,22 @@ describe("ErcWrapper", () => {
       wrappedBalance.amounts.toString(),
     );
 
+  });
+
+  it("Wrapping only from allowed list (Should fail)", async function () {
     console.log("Starting wrap with not allowed token");
+    const toSwap = ethers.utils.parseEther("20");
+
+    const userTokenB = TokenB.connect(user1);
+    await userTokenB.approve(ErcWrapper.address, toSwap);
+    const NotAllowedToken = NotListedToken.connect(user1);
+    await NotAllowedToken.approve(ErcWrapper.address, toSwap);
 
     await userTokenB.approve(ErcWrapper.address, toSwap);
     await NotAllowedToken.approve(ErcWrapper.address, toSwap);
-    // expect is wrong
-    await userWrapper.wrapper([TokenA.address, NotAllowedToken.address], [toSwap, toSwap]);
 
-    console.log("Success! Token not allowed");
-
-    const userWrapperBalanceNew = await userWrapper.balanceOf(user1.address);
-
-    // This returns len
-    console.log("User1 owns:", userWrapperBalanceNew.toString(), "Basket (should be 1)");
-    const wrappedBalanceNew = await userWrapper.wrappedBalance(2);
-
-    console.log(
-      "Basket ID",
-      wrappedBalanceNew.id.toString(),
-      "\nBasket Tokens",
-      wrappedBalanceNew.tokens,
-      "\nBasket Tokens amounts",
-      wrappedBalanceNew.amounts.toString(),
-    );
+    const userWrapper = ErcWrapper.connect(user1);
+    await expect(await userWrapper.wrapper([TokenA.address, NotAllowedToken.address], [toSwap, toSwap])).to.be.reverted;
   });
+
 });

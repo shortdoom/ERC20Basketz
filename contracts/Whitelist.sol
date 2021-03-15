@@ -5,8 +5,6 @@ contract Whitelist {
 
     mapping(address => address) private priceList; // This def stays, because we need to match neatly token<>pair
 
-    // address aaveFeed = LINK price feed
-    // priceList[_aave] = aaveFeed / Return price feed for user token
     constructor(
         address _aave,
         address _btcFeed
@@ -20,8 +18,17 @@ contract Whitelist {
     }
 
     function isAllowed(address token) public view returns (bool) {
-        // require(priceList[token]);
-        return(true);
+        bool success = priceList[token] != address(0);
+        return(success);
+    }
+
+    function isAllowedLoop(address token) public view returns (bool) {
+        // require(priceList[token] != address(0), "No Chainlink Price Feed");
+        if (priceList[token] != address(0)) {
+            return(true);
+        } else {
+            return (false);
+        }
     }
     function getMember(address token) public view returns (address) {
         return (priceList[token]);
