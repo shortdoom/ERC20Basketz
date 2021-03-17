@@ -13,15 +13,15 @@ contract Whitelist {
     mapping(address => address) private priceList;
 
     constructor(
-        address _aave,
-        address _btcFeed
+        address _snx,
+        address _uni
     ) {
         // TokenA is allowed because it's in priceList
-        address aaveFeed = 0x6Df09E975c830ECae5bd4eD9d90f3A95a4f88012;
-        priceList[_aave] = aaveFeed;
+        address snxFeed = 0xF9A76ae7a1075Fe7d646b06fF05Bd48b9FA5582e;
+        priceList[_snx] = snxFeed;
 
-        address btcFeed = 0xdeb288F737066589598e9214E782fa5A8eD689e8;
-        priceList[_btcFeed] = btcFeed;
+        address uniFeed = 0xD6aA3D25116d8dA79Ea0246c4826EB951872e02e;
+        priceList[_uni] = uniFeed;
     }
 
     function isAllowed(address token) public view returns (bool) {
@@ -29,15 +29,6 @@ contract Whitelist {
         return(success);
     }
 
-    function isAllowedLoop(address token) public view returns (bool) {
-        // require(priceList[token] != address(0), "No Chainlink Price Feed");
-        // NOTE: This for sure can be done better :)
-        if (priceList[token] != address(0)) {
-            return(true);
-        } else {
-            return (false);
-        }
-    }
     function getMember(address token) public view returns (address) {
         return (priceList[token]);
     }

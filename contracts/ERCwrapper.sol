@@ -33,7 +33,7 @@ Current thoughts:
 1) Appropriate types for storage variables (price feeds & user balance)
 2) Access control to functions (currently require, limited modifiers)
 3) Loops avoidance
-4) Better construction of Whitelist
+4) Better construction of Whitelist (superlong contructor is bad)
  */
 
 contract ercWrapper is ERC721, Whitelist {
@@ -59,7 +59,7 @@ contract ercWrapper is ERC721, Whitelist {
         _;
     }
 
-    constructor(address _aave, address _btcFeed) ERC721("WrappedIndex", "WRAP") Whitelist(_aave, _btcFeed) {
+    constructor(address _snx, address _uni) ERC721("WrappedIndex", "WRAP") Whitelist(_snx, _uni) {
         backend = msg.sender;
     }
 
@@ -71,12 +71,14 @@ contract ercWrapper is ERC721, Whitelist {
         uint256 basketSize = tokens.length;
         require(basketSize <= 10, "Maxiumum  Basket size allowed");
 
+        // This is for sure not optimal solution
         for (uint256 i = 0; i < tokens.length; i++) {
-            bool success = isAllowedLoop(tokens[i]);
+            bool success = isAllowed(tokens[i]);
             require(success == true, "No Chainlink Price Feed Available");
         }
 
         for (uint256 i = 0; i < tokens.length; i++) {
+            // NOTE: Refund if some token transfer failed
             bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
             require(success, "Transfer failed");
         }
@@ -92,7 +94,10 @@ contract ercWrapper is ERC721, Whitelist {
 
     function wrapperBackend(address[] memory tokens, uint256[] memory amounts) public backEnd returns (uint256) {
         // NOTE: No need to check, but introduces additional role of backEnd script
+        uint256 basketSize = tokens.length;
+        require(basketSize <= 10, "Maxiumum  Basket size allowed");
         for (uint256 i = 0; i < tokens.length; i++) {
+            // NOTE: Refund if some token transfer failed
             bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
             require(success, "Transfer failed");
         }
@@ -145,21 +150,31 @@ contract ercWrapper is ERC721, Whitelist {
     }
 
     function priceBasket(uint256 _wrapId) public returns (uint256 basketPrice) {
-        // NOTE: Currently it returns only total price of Basket. Should also give access to individual.
+        // NOTE: Currently it returns only total price of Basket. Should also give access to individual components.
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         uint256 total;
         for (uint256 i = 0; i < wrapped[msg.sender][_wrapId].tokens.length; i++) {
-            priceFeed = AggregatorV3Interface(getMember(wrapped[msg.sender][_wrapId].tokens[i]));
-            total.add(uint256(getLatestPrice()));
+            address feed = getMember(wrapped[msg.sender][_wrapId].tokens[i]);
+            priceFeed = AggregatorV3Interface(feed); // feed is correct, checked with getMember
+            
+            // NOTE: THIS IS MOCKUP OF LINK FUNCTION TO KEEP MAINNET WHITELIST
+            // Should be tested with kovan anyways!
+            // (uint80 roundID, int256 price, uint256 startedAt, uint256 timeStamp, uint80 answeredInRound) =
+            //         priceFeed.latestRoundData();
+
+            int256 price = MockLinkFeed();
+
+            total = total.add(uint256(price));
         }
         return total;
     }
 
-    function getLatestPrice() public view returns (int256) {
-        (uint80 roundID, int256 price, uint256 startedAt, uint256 timeStamp, uint80 answeredInRound) =
-            priceFeed.latestRoundData();
-        return price;
+    function MockLinkFeed() public pure returns(int256) {
+        // Could get real price from mainnet  
+        int256 value = 66666;
+        return(value);
     }
+
 
     function wrappedBalance(uint256 _wrapId)
         public
@@ -174,8 +189,7 @@ contract ercWrapper is ERC721, Whitelist {
         return (_wrapId, wrapped[owner][_wrapId].tokens, wrapped[owner][_wrapId].amounts);
     }
 
-    function basketBalance(address owner, uint256 _wrapId) public view returns(uint256) {
-        // offer[msg.sender][_wrapId] = priceBasket(_wrapId);
-        return(offer[owner][_wrapId]);
+    function basketBalance(address owner, uint256 _wrapId) public view returns (uint256) {
+        return (offer[owner][_wrapId]);
     }
 }
