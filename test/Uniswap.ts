@@ -104,13 +104,11 @@ describe("Testing ERCwrapper with Uniswap Tokens", () => {
     const balanceUni = await UniContract.balanceOf(user1.address);
     console.log("UNI purchased", ethers.utils.formatUnits(balanceUni.toString(), "ether"));
 
-    // const userWrapper = ErcWrapper.connect(user1);
-    // const token = await userWrapper.getMember(SnxContract.address);
-    // console.log(token);
-
     const userWrapper = ErcWrapper.connect(user1);
     await userWrapper.wrapper([SnxContract.address, UniContract.address], [toSwap, toSwap]);
     console.log('Successful wrapp with allowed');
+    const token = await userWrapper.getMember(SnxContract.address);
+    console.log(token);
 
     const wrappedBalance = await userWrapper.wrappedBalance(1);
 

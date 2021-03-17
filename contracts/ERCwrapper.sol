@@ -46,7 +46,7 @@ contract ercWrapper is ERC721, Whitelist {
 
     address private backend;
     mapping(address => mapping(uint256 => UserIndex)) private wrapped;
-    mapping(address => mapping(uint256 => uint256)) private offer;
+    mapping(address => mapping(uint256 => uint256)) private pricing;
 
     struct UserIndex {
         address[] tokens;
@@ -59,7 +59,7 @@ contract ercWrapper is ERC721, Whitelist {
         _;
     }
 
-    constructor(address _snx, address _uni) ERC721("WrappedIndex", "WRAP") Whitelist(_snx, _uni) {
+    constructor(address[] memory _tokens, address[] memory _feeds) ERC721("WrappedIndex", "WRAP") Whitelist(_tokens, _feeds) {
         backend = msg.sender;
     }
 
@@ -146,8 +146,27 @@ contract ercWrapper is ERC721, Whitelist {
     function createOrder(uint256 _wrapId) external {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         wrapped[msg.sender][_wrapId].locked = true; // Cannot transfer & Unwrap now
-        offer[msg.sender][_wrapId] = priceBasket(_wrapId); // Set price for basket
+        
+        // This needs to be a Struct too because bidders will need to have an access in placeOrder
+        // Add deadline
+        pricing[msg.sender][_wrapId] = priceBasket(_wrapId); // Set price for basket ***SHOULD BE GENERALLY FUNCTION CALLED MULTIPLE TIMES THROUGH CONTRACT***
+        // Here Exchange logic should start :) Lets assume that this contract executes following good access patern (before testing)
     }
+
+    function fillOrder(address payable _owner, uint256 _wrapId) public payable {
+        require(wrapped[_owner][_wrapId].locked = true, "Basket not locked for sale");
+        require(pricing[_owner][_wrapId] >= msg.value, "Not enough funds transfered");
+        _owner.transfer(msg.value);
+        wrapped[_owner][_wrapId].locked = false;
+        
+        // can't call _transfer because msg.sender is passed
+        // fuck, transfer is overwriting everything so it will always pass msg.sender...
+        // Can one avoid calling it?
+        super._transfer(_owner, msg.sender, _wrapId); // Call ERC721
+        wrapped[msg.sender][_wrapId] = wrapped[_owner][_wrapId];
+        delete wrapped[_owner][_wrapId];
+    }
+
 
     function priceBasket(uint256 _wrapId) public returns (uint256 basketPrice) {
         // NOTE: Currently it returns only total price of Basket. Should also give access to individual components.
@@ -190,6 +209,6 @@ contract ercWrapper is ERC721, Whitelist {
     }
 
     function basketBalance(address owner, uint256 _wrapId) public view returns (uint256) {
-        return (offer[owner][_wrapId]);
+        return (pricing[owner][_wrapId]);
     }
 }
