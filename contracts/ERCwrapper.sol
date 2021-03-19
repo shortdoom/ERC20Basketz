@@ -13,17 +13,18 @@ import "./Whitelist.sol";
 
 Basic functionality: Wrap & Unwrap ERC20 Baskets stored as NFT
 Extended basic functionality: Ability to Transfer ERC20 Baskets as NFT
-Feature: P2P exchange of Baskets / Buy-Sell Basket for ETH
-Extended feature: Stack NFT Basket for overcollaterized loan
-Chainlink role: Current value of the Basket
-ERC721 URI: Additional data which makes sense to calculate offchain (e.g volatility)
+Feature: P2P exchange of Baskets / Buy-Sell Basket for ETH / Swap Basket<>Basket
+Extended feature: Bidding on Baskets
+Extended feature: Use Basket for a loan on a 3rd party service. Staking function.
+Chainlink role: Current value of the Basket.
+ERC721 URI: Additional data which makes sense to calculate offchain (e.g volatility, performance of basket over time)
 
 Contract should be fully ERC721 capable.
 
-1) Users approves and sends tokens
+1) Users approves and sends tokens (min. 2, max. 10)
 2) Contract checks if tokens are whitelisted for wrapping
-    2a) Function wrappedBackend is a placeholder for change of dev path and doing whitelisting offchain, considerations are above function definition
-3) User wrappedBalance incremented, NFT token coresponding to balance minted (mapping wrapped)
+    2a) Function wrappedBackend is a placeholder for a possible change of development path and doing whitelisting offchain
+3) User wrappedBalance incremented, NFT token coresponding to balance minted (mapping `wrapped`)
 4) User can unwrap NFT he owns back to his ERC20 tokens.
 5) User can transfer (trade*) NFT and ownership of claim on wrapped Tokens
 6) User can check balance of his basket
@@ -33,7 +34,8 @@ Current thoughts:
 1) Appropriate types for storage variables (price feeds & user balance)
 2) Access control to functions (currently require, limited modifiers)
 3) Loops avoidance
-4) Better construction of Whitelist (superlong contructor is bad)
+4) Contract structure is chaotic (Factory pattern?)
+5) Gas optimization
  */
 
 contract ercWrapper is ERC721, Whitelist {
@@ -45,13 +47,19 @@ contract ercWrapper is ERC721, Whitelist {
     AggregatorV3Interface internal priceFeed;
 
     address private backend;
-    mapping(address => mapping(uint256 => UserIndex)) private wrapped;
-    mapping(address => mapping(uint256 => uint256)) private pricing;
+    mapping(address => mapping(uint256 => UserIndex)) public wrapped;
+    mapping(address => mapping(uint256 => Bid)) bidding;
 
     struct UserIndex {
         address[] tokens;
         uint256[] amounts;
         bool locked;
+    }
+
+    struct Bid {
+        uint256 deadline;
+        uint256 priceSlip; // Allowed slip from price after posting order
+        uint256 price; // 
     }
 
     modifier backEnd() {
@@ -71,7 +79,7 @@ contract ercWrapper is ERC721, Whitelist {
         uint256 basketSize = tokens.length;
         require(basketSize <= 10, "Maxiumum  Basket size allowed");
 
-        // This is for sure not optimal solution
+        // This is for sure not an optimal solution
         for (uint256 i = 0; i < tokens.length; i++) {
             bool success = isAllowed(tokens[i]);
             require(success == true, "No Chainlink Price Feed Available");
@@ -143,26 +151,19 @@ contract ercWrapper is ERC721, Whitelist {
         delete wrapped[msg.sender][_wrapId];
     }
 
-    function createOrder(uint256 _wrapId) external {
+    function createOrder(uint256 _wrapId, uint256 _deadline, uint256 _priceSlip) external {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         wrapped[msg.sender][_wrapId].locked = true; // Cannot transfer & Unwrap now
-        
-        // This needs to be a Struct too because bidders will need to have an access in placeOrder
-        // Add deadline, Slippage (hm, BUYER vs. SELLER slippage)
-        pricing[msg.sender][_wrapId] = priceBasket(_wrapId); // Set price for basket ***SHOULD BE GENERALLY FUNCTION CALLED MULTIPLE TIMES THROUGH CONTRACT***
-        // Here Exchange logic should start :) Lets assume that this contract executes following good access patern (before testing)
+        // pricing[msg.sender][_wrapId] = priceBasket(_wrapId); // Sets Initial Price
+        uint256 priceFloor = priceBasket(_wrapId);
+        bidding[msg.sender][_wrapId] = Bid({deadline: _deadline, priceSlip: _priceSlip, price: priceFloor});
     }
 
     function fillOrder(address payable _owner, uint256 _wrapId) public payable {
         require(wrapped[_owner][_wrapId].locked = true, "Basket not locked for sale");
-        // Buyer needs to know the price. Seller needs to set the price.
-        require(pricing[_owner][_wrapId] >= msg.value, "Not enough funds transfered");
-
-        // NOTE: An ultimate problem is that there is no way for ensuring correct on-chain pricing <> delivery
-        // Assumption 1: Can pricing be 0 cost? Solution: Centrlize (parts of ) contract and ensure correct price
-        // Assumption 2: Can data update happen on low costs and with right incentive?
-        // EXAMPLE: Who should pay for price-check? How does one bid? How does one stake?
-        // PRICING IS THE PROBLEM SO EVEN METATX DOESN'T SOLVE IT...
+        require(bidding[_owner][_wrapId].price >= msg.value, "Not enough funds transfered");
+        require(bidding[_owner][_wrapId].deadline >= block.timestamp, "Pass deadline"); 
+        // require(bidding[_owner].priceSlip >= msg.value, "Pricing out of bounds"); // This should check function returning correct calculation        
         
         _owner.transfer(msg.value);
         wrapped[_owner][_wrapId].locked = false;
@@ -171,22 +172,20 @@ contract ercWrapper is ERC721, Whitelist {
         delete wrapped[_owner][_wrapId];
     }
 
+    function cancelOrder(uint256 _wrapId) public {
+        require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
+        delete bidding[msg.sender][_wrapId];
+        wrapped[msg.sender][_wrapId].locked = false;
+    }
+
 
     function priceBasket(uint256 _wrapId) public returns (uint256 basketPrice) {
-        // NOTE: Currently it returns only total price of Basket. Should also give access to individual components.
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         uint256 total;
         for (uint256 i = 0; i < wrapped[msg.sender][_wrapId].tokens.length; i++) {
             address feed = getMember(wrapped[msg.sender][_wrapId].tokens[i]);
             priceFeed = AggregatorV3Interface(feed); // feed is correct, checked with getMember
-            
-            // NOTE: THIS IS MOCKUP OF LINK FUNCTION TO KEEP MAINNET WHITELIST
-            // Should be tested with kovan anyways!
-            // (uint80 roundID, int256 price, uint256 startedAt, uint256 timeStamp, uint80 answeredInRound) =
-            //         priceFeed.latestRoundData();
-
             int256 price = MockLinkFeed();
-
             total = total.add(uint256(price));
         }
         return total;
@@ -213,6 +212,6 @@ contract ercWrapper is ERC721, Whitelist {
     }
 
     function basketBalance(address owner, uint256 _wrapId) public view returns (uint256) {
-        return (pricing[owner][_wrapId]);
+        return (bidding[owner][_wrapId].price);
     }
 }
