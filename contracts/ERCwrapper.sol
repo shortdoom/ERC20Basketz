@@ -148,20 +148,24 @@ contract ercWrapper is ERC721, Whitelist {
         wrapped[msg.sender][_wrapId].locked = true; // Cannot transfer & Unwrap now
         
         // This needs to be a Struct too because bidders will need to have an access in placeOrder
-        // Add deadline
+        // Add deadline, Slippage (hm, BUYER vs. SELLER slippage)
         pricing[msg.sender][_wrapId] = priceBasket(_wrapId); // Set price for basket ***SHOULD BE GENERALLY FUNCTION CALLED MULTIPLE TIMES THROUGH CONTRACT***
         // Here Exchange logic should start :) Lets assume that this contract executes following good access patern (before testing)
     }
 
     function fillOrder(address payable _owner, uint256 _wrapId) public payable {
         require(wrapped[_owner][_wrapId].locked = true, "Basket not locked for sale");
+        // Buyer needs to know the price. Seller needs to set the price.
         require(pricing[_owner][_wrapId] >= msg.value, "Not enough funds transfered");
+
+        // NOTE: An ultimate problem is that there is no way for ensuring correct on-chain pricing <> delivery
+        // Assumption 1: Can pricing be 0 cost? Solution: Centrlize (parts of ) contract and ensure correct price
+        // Assumption 2: Can data update happen on low costs and with right incentive?
+        // EXAMPLE: Who should pay for price-check? How does one bid? How does one stake?
+        // PRICING IS THE PROBLEM SO EVEN METATX DOESN'T SOLVE IT...
+        
         _owner.transfer(msg.value);
         wrapped[_owner][_wrapId].locked = false;
-        
-        // can't call _transfer because msg.sender is passed
-        // fuck, transfer is overwriting everything so it will always pass msg.sender...
-        // Can one avoid calling it?
         super._transfer(_owner, msg.sender, _wrapId); // Call ERC721
         wrapped[msg.sender][_wrapId] = wrapped[_owner][_wrapId];
         delete wrapped[_owner][_wrapId];
