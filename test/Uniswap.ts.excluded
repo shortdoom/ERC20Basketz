@@ -29,6 +29,13 @@ describe("Testing ERCwrapper with Uniswap Tokens", () => {
   let user1: SignerWithAddress;
   let user2: SignerWithAddress;
 
+  /**
+   * Make 4 Token Feeds and token Transfers. Add more wraps for user1 to test balances.
+   * Test always requires. Expect reverts. Check balances.
+   * Use conclusions from writing tests to adjust Exchange/Swap feature.
+   * Does chainlink has sense? How to fit it best (can be also offchain)
+   */
+
   before(async () => {
     [deployer, user1, user2] = await ethers.getSigners();
 
@@ -58,10 +65,9 @@ describe("Testing ERCwrapper with Uniswap Tokens", () => {
 
     const wrapperFactory = new ErcWrapper__factory(deployer);
     ErcWrapper = await wrapperFactory.deploy(tokens, feeds);
-    // ErcWrapper = await wrapperFactory.deploy(SnxToken, UniToken);
 
     const user1Router = new ethers.Contract(UniAddress, UniswapV2Router02.abi, user1);
-    const user2Router = new ethers.Contract(UniAddress, UniswapV2Router02.abi, user1);
+    const user2Router = new ethers.Contract(UniAddress, UniswapV2Router02.abi, user2);
 
     let deadline = Date.now() + 300;
     const valueBigNum = ethers.utils.parseEther("10");
@@ -99,105 +105,66 @@ describe("Testing ERCwrapper with Uniswap Tokens", () => {
   });
 
   beforeEach(async () => {
+
+    // Before each test it creates basket for User1 with consecutive numbers 1,2,3,4...
     const toSwap = ethers.utils.parseEther("10");
+
     const userTokenA = SnxContract.connect(user1);
     await userTokenA.approve(ErcWrapper.address, toSwap);
     const userTokenB = UniContract.connect(user1);
     await userTokenB.approve(ErcWrapper.address, toSwap);
+
     const userWrapper = ErcWrapper.connect(user1);
     expect(await userWrapper.wrapper([UniContract.address, SnxContract.address], [toSwap, toSwap]));
     const wrappedBalance = await userWrapper.wrappedBalance(1);
-    console.log(
-      "Basket ID",
-      wrappedBalance.id.toString(),
-      "\nBasket Tokens",
-      wrappedBalance.tokens,
-      "\nBasket Tokens amounts",
-      wrappedBalance.amounts.toString(),
-    );
-    let deadline = Date.now() + 300;
-    await userWrapper.createOrder(1, deadline, 50000, 10);
-    const value = await userWrapper.basketBalance(user1.address, 1);
-    console.log("Curent basket Price:", value.toString());
+    console.log("Balance of user1", await userWrapper.balanceOf(user1.address));
+
   });
 
-  it("Price Basket", async function () {
-    const toSwap = ethers.utils.parseEther("10");
-
-    // Approve two tokens which will become NFT-Index
-    // const userTokenA = SnxContract.connect(user1);
-    // await userTokenA.approve(ErcWrapper.address, toSwap);
-    // const userTokenB = UniContract.connect(user1);
-    // await userTokenB.approve(ErcWrapper.address, toSwap);
-    
-    // const balanceSnx = await SnxContract.balanceOf(user1.address);
-    // console.log("SNX purchased", ethers.utils.formatUnits(balanceSnx.toString(), "ether"));
-    // const balanceUni = await UniContract.balanceOf(user1.address);
-    // console.log("UNI purchased", ethers.utils.formatUnits(balanceUni.toString(), "ether"));
-
+  it("Create order", async function () {
     const userWrapper = ErcWrapper.connect(user1);
-    // await userWrapper.wrapper([UniContract.address, SnxContract.address], [toSwap, toSwap]);
-    // console.log('Successful wrapp with allowed');
-
-    // const wrappedBalance = await userWrapper.wrappedBalance(1);
-
-    // console.log(
-    //   "Basket ID",
-    //   wrappedBalance.id.toString(),
-    //   "\nBasket Tokens",
-    //   wrappedBalance.tokens,
-    //   "\nBasket Tokens amounts",
-    //   wrappedBalance.amounts.toString(),
-    // );
-    // const balanceAfterWrap = await SnxContract.balanceOf(user1.address);
-    // console.log("SNX balance", ethers.utils.formatUnits(balanceAfterWrap.toString(), "ether"));
-    // const balanceAfterWrapUni = await UniContract.balanceOf(user1.address);
-    // console.log("UNI balance", ethers.utils.formatUnits(balanceAfterWrapUni.toString(), "ether"));
-
-    // This will fail now
-    // We need to mimic tokens existing in chainlink feeds (all mainnet)
     let deadline = Date.now() + 300;
-    await userWrapper.createOrder(1, deadline, 50000, 10);
+    // _wrapId, _deadline, _priceSlip, _premium
+    // LOCK FOR CREATING ONLY ONE ORDER FOR GIVEN ID!
+    await expect(userWrapper.createOrder(1, deadline, 50000, 10));
     const value = await userWrapper.basketBalance(user1.address, 1);
     console.log("Curent basket Price:", value.toString());
+    console.log("Order created");
   });
 
   it("Fill Order", async function () {
-    // Just creating basket one more time (this screams for remodeling)
-    // const toSwap = ethers.utils.parseEther("10");
-    // const userTokenA = SnxContract.connect(user1);
-    // await userTokenA.approve(ErcWrapper.address, toSwap);
-    // const userTokenB = UniContract.connect(user1);
-    // await userTokenB.approve(ErcWrapper.address, toSwap);
-    // const userWrapper = ErcWrapper.connect(user1);
-    // expect(await userWrapper.wrapper([UniContract.address, SnxContract.address], [toSwap, toSwap]));
-    // const wrappedBalance = await userWrapper.wrappedBalance(1);
-    // console.log(
-    //   "Basket ID",
-    //   wrappedBalance.id.toString(),
-    //   "\nBasket Tokens",
-    //   wrappedBalance.tokens,
-    //   "\nBasket Tokens amounts",
-    //   wrappedBalance.amounts.toString(),
-    // );
-    // let deadline = Date.now() + 300;
-    // await userWrapper.createOrder(1, deadline, 50000, 10);
-    // const value = await userWrapper.basketBalance(user1.address, 1);
-    // console.log("Curent basket Price:", value.toString());
-    // END 
-
     const buyerWrapper = ErcWrapper.connect(user2);
-
     // Different ways to obtain data for buyer
+    // Buyer needs to know tokenId (wrapId)
     const _owner = await ErcWrapper.ownerOf(1); // buyer knows owner address
     const valueFill = await ErcWrapper.basketBalance(_owner, 1);
-    expect(await buyerWrapper.fillOrder(_owner, 1, {value: valueFill}));
+    await expect(buyerWrapper.fillOrder(_owner, 1, {value: valueFill}));
     const newOwner = await ErcWrapper.ownerOf(1);
     console.log("New owner of basket", newOwner);
     console.log("Should be", user2.address);
-
-
   });
+
+  it("Create order not authorized", async function () {
+    const NAWrapper = ErcWrapper.connect(user2);
+    const owner = await ErcWrapper.ownerOf(1);
+    console.log("Owner of basket1 is", owner, "Sender of this msg is", user2.address);
+    let deadline = Date.now() + 300;
+    expect(await NAWrapper.createOrder(1, deadline, 50000, 10));
+  });
+
+  it("Cancel order", async function () {
+    const userWrapper = ErcWrapper.connect(user1);
+    const NAWrapper = ErcWrapper.connect(user2);
+    // await expect(token.transfer(walletTo.address, 1007)).to.be.reverted;
+    await expect(NAWrapper.cancelOrder(1));
+    // await expect(userWrapper.cancelOrder(1), "Success! Order closed");
+  });
+
+  // it("Non authorized Order", async function () {
+  //   const NAWrapper = ErcWrapper.connect(user2);
+  //   let deadline = Date.now() + 300;
+  //   await expect(NAWrapper.createOrder(1, deadline, 50000, 10)).to.be.revertedWith("Not an owner of a basket");
+  // });
 
 });
 

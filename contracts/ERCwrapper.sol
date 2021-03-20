@@ -121,8 +121,10 @@ contract ercWrapper is ERC721, Whitelist {
         return wrapId;
     }
 
-    function unwrapper(uint256 _wrapId) external {
-        require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
+    function unwrapper(uint256 _wrapId) public {
+        // require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
+        address owner = ERC721.ownerOf(_wrapId); // Fails here? Check addresses
+        require(msg.sender == owner, "Not an owner of a basket");
         require(wrapped[msg.sender][_wrapId].locked == false, "Cannot unwrap locked");
 
         for (uint256 i = 0; i < wrapped[msg.sender][_wrapId].tokens.length; i++) {
@@ -179,7 +181,8 @@ contract ercWrapper is ERC721, Whitelist {
     }
 
     function cancelOrder(uint256 _wrapId) public {
-        require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
+        address owner = ERC721.ownerOf(_wrapId);
+        require(owner == msg.sender, "Not an owner of a basket");
         delete bidding[msg.sender][_wrapId];
         wrapped[msg.sender][_wrapId].locked = false;
     }
