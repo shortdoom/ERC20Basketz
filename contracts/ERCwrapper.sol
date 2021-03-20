@@ -31,6 +31,10 @@ Contract should be fully ERC721 capable.
 7) Contract uses chainlink Ethereum Price Feeds to calculate value of the Basket (explains also limits on tokens in Basket)
 
 Current thoughts:
+
+Reversed Auto Matching
+Buyers pool funds and specify bid vectors (Can they update vectors?)
+
 1) Appropriate types for storage variables (price feeds & user balance)
 2) Access control to functions (currently require, limited modifiers)
 3) Loops avoidance
@@ -48,7 +52,7 @@ contract ercWrapper is ERC721, Whitelist {
 
     address private backend;
     mapping(address => mapping(uint256 => UserIndex)) public wrapped;
-    mapping(address => mapping(uint256 => Bid)) bidding;
+    mapping(address => mapping(uint256 => Bid)) public bidding;
 
     struct UserIndex {
         address[] tokens;
@@ -82,7 +86,8 @@ contract ercWrapper is ERC721, Whitelist {
         // This is for sure not an optimal solution
         for (uint256 i = 0; i < tokens.length; i++) {
             bool success = isAllowed(tokens[i]);
-            require(success == true, "No Chainlink Price Feed Available");
+            // bool s1 = Whitelist.priceList[tokens[i]];
+            require(success, "No Chainlink Price Feed Available");
         }
 
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -151,11 +156,12 @@ contract ercWrapper is ERC721, Whitelist {
         delete wrapped[msg.sender][_wrapId];
     }
 
-    function createOrder(uint256 _wrapId, uint256 _deadline, uint256 _priceSlip) external {
+    function createOrder(uint256 _wrapId, uint256 _deadline, uint256 _priceSlip, uint256 _premium) external {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         wrapped[msg.sender][_wrapId].locked = true; // Cannot transfer & Unwrap now
         // pricing[msg.sender][_wrapId] = priceBasket(_wrapId); // Sets Initial Price
         uint256 priceFloor = priceBasket(_wrapId);
+        uint256 premium = _premium;
         bidding[msg.sender][_wrapId] = Bid({deadline: _deadline, priceSlip: _priceSlip, price: priceFloor});
     }
 

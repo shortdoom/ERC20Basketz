@@ -10,26 +10,22 @@ pragma experimental ABIEncoderV2;
 
 contract Whitelist {
 
-    mapping(address => address) private priceList;
+    // token => feed
+    mapping(address => address) public priceList;
 
     constructor(
-        address[] memory _tokens,
-        address[] memory _feeds
+        address[] memory tokens,
+        address[] memory feeds
     ) {
         // TokenA is allowed because it's in priceList
-        // address snxFeed = 0xF9A76ae7a1075Fe7d646b06fF05Bd48b9FA5582e;
-        // priceList[_snx] = snxFeed;
-
-        // address uniFeed = 0xD6aA3D25116d8dA79Ea0246c4826EB951872e02e;
-        // priceList[_uni] = uniFeed;
-
-        for (uint256 i = 0; i > _feeds.length; i++) {
-            priceList[_tokens[i]] = _feeds[i];
+        // I think we should push here...
+        for (uint256 i = 0; i < tokens.length; i++) {
+            priceList[tokens[i]] = feeds[i];
         }
     }
 
     function isAllowed(address token) public view returns (bool) {
-        bool success = priceList[token] != address(0);
+        bool success = priceList[token] != address(0); // T-F if priceList[snxAddress] has non-0
         return(success);
     }
 
