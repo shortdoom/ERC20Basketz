@@ -181,6 +181,7 @@ contract ercWrapper is ERC721, Whitelist {
     function cancelOrder(uint256 _wrapId) public {
         address owner = ERC721.ownerOf(_wrapId);
         require(owner == msg.sender, "Not an owner of a basket");
+        require(wrapped[msg.sender][_wrapId].locked = true, "Not for sale");
         delete bidding[msg.sender][_wrapId];
         wrapped[msg.sender][_wrapId].locked = false;
     }
@@ -196,6 +197,10 @@ contract ercWrapper is ERC721, Whitelist {
             total = total.add(uint256(price));
         }
         return total;
+    }
+
+    function updatePrice(uint256 _wrapId) public returns (uint256 basketPrice) {
+        
     }
 
     function MockLinkFeed() public pure returns(int256) {
