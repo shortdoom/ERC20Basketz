@@ -36,19 +36,23 @@ describe("ErcWrapper", () => {
     TokenB = await ERC20Factory.deploy(TOTALSUPPLY);
     TokenC = await ERC20Factory.deploy(TOTALSUPPLY);
     NotListedToken = await ERC20Factory.deploy(TOTALSUPPLY);
+
+    // User1 Tokens
     await TokenA.transfer(user1.address, ethers.utils.parseEther("100"));
     await TokenB.transfer(user1.address, ethers.utils.parseEther("100"));
     await TokenC.transfer(user1.address, ethers.utils.parseEther("100"));
     await NotListedToken.transfer(user1.address, ethers.utils.parseEther("100"));
 
+    // User2 Transfer
     await TokenB.transfer(user2.address, ethers.utils.parseEther("100"));
     await NotListedToken.transfer(user2.address, ethers.utils.parseEther("100"));
 
-    // We don't actually call Chainlink now, so loading any feeds will do
+    // Deploy ERCWrapper
     const feeds = await fs.readFileSync("scripts/feeds.txt", "utf-8").split('\n');
     const wrapperFactory = new ErcWrapper__factory(deployer);
     ErcWrapper = await wrapperFactory.deploy([TokenA.address, TokenB.address], feeds);
   });
+
 
   it("Standard wrapping", async function () {
     const toSwap = ethers.utils.parseEther("20");
@@ -109,17 +113,21 @@ describe("ErcWrapper", () => {
 
   it("Unwrapping", async function () {
     console.log("Starting wrap with not allowed token");
-    const userWrapper = ErcWrapper.connect(user1);
-    const user2Wrapper = ErcWrapper.connect(user2);
-    const basketId = await userWrapper.ownerOf(1);
-    console.log("Owner of basketId 1", basketId.toString());
-    console.log("User1:", user1.address, "User2:", user2.address);
+    const NotAllowedUser = ErcWrapper.connect(user2);
+    console.log("Owner:", user1.address, "NotAllowed:", user2.address);
+    const showOwner = await ErcWrapper.balanceOf(user2.address);
+    console.log("Balance of Notallowed:", showOwner.toString(), "Should be 0");
+
+    // Okay, so, remember about proper await except(instane.Call()).to.be.revertedWith
     // SHOULD FAIL, WE KNOW USER2 DOESN'T OWN ANY BASKET AND CANNOT UNWRAP NOT OWNED BASKET
-    expect(await user2Wrapper.unwrapper(1)).to.be.revertedWith("Not an owner of a basket");
+    await expect(NotAllowedUser.unwrapper(1), "Old owner shouldn't be able to unwrap").to.be.revertedWith("Not an owner of a basket");
     console.log("Only owner can unwrap (revert)");
 
     // SUCCEEDS AS SHOULD, USER1 UNWRAPS WRAP1 AND ZEROES BALANCE
-    expect(await userWrapper.unwrapper(1));
+    const userWrapper = ErcWrapper.connect(user1);
+    const basketId = await userWrapper.ownerOf(1);
+    console.log("Owner of basketId 1", basketId.toString());
+    await expect(userWrapper.unwrapper(1));
     const hasTokens = await userWrapper.balanceOf(user1.address); // So, balance is carried between it!
     console.log("Basket unwrapped! Should not own any", hasTokens.toString());
     expect(hasTokens).to.be.equal(0);  

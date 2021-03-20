@@ -122,9 +122,7 @@ contract ercWrapper is ERC721, Whitelist {
     }
 
     function unwrapper(uint256 _wrapId) public {
-        // require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
-        address owner = ERC721.ownerOf(_wrapId); // Fails here? Check addresses
-        require(msg.sender == owner, "Not an owner of a basket");
+        require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         require(wrapped[msg.sender][_wrapId].locked == false, "Cannot unwrap locked");
 
         for (uint256 i = 0; i < wrapped[msg.sender][_wrapId].tokens.length; i++) {
