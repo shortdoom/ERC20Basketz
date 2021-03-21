@@ -167,26 +167,27 @@ contract ercWrapper is ERC721, Whitelist {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         require(bidding[msg.sender][_wrapId].onSale == false, "Basket already listed");
         wrapped[msg.sender][_wrapId].locked = true; // Cannot transfer & Unwrap now
-        uint256 _priceBasket = priceBasket(_wrapId);
+        bool priceUpdate = false;
+        uint256 _priceBasket = priceBasket(_wrapId, priceUpdate);
         uint256 price = _priceBasket.add(_premium);
         bidding[msg.sender][_wrapId] = Bid({price: price, onSale: true});
     }
 
-    function priceBasket(uint256 _wrapId) public returns (uint256 basketPrice) {
+    function priceBasket(uint256 _wrapId, bool priceUpdate) public returns (uint256 basketPrice) {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         uint256 total;
         for (uint256 i = 0; i < wrapped[msg.sender][_wrapId].tokens.length; i++) {
             address feed = getMember(wrapped[msg.sender][_wrapId].tokens[i]);
             priceFeed = AggregatorV3Interface(feed); // feed is correct, checked with getMember
-            int256 price = MockLinkFeed();
+            int256 price = MockLinkFeed(priceUpdate);
             total = total.add(uint256(price));
         }
         return total;
     }
 
     function fillOrder(address payable _owner, uint256 _wrapId) public payable {
-        require(wrapped[_owner][_wrapId].locked = true, "Basket not locked for sale");
-        require(bidding[_owner][_wrapId].price >= msg.value, "Not enough funds transfered");
+        require(wrapped[_owner][_wrapId].locked == true, "Basket not locked for sale");
+        require(msg.value >= bidding[_owner][_wrapId].price, "Not enough funds transfered");
         
         _owner.transfer(msg.value);
         wrapped[_owner][_wrapId].locked = false;
@@ -198,19 +199,29 @@ contract ercWrapper is ERC721, Whitelist {
     function cancelOrder(uint256 _wrapId) public {
         address owner = ERC721.ownerOf(_wrapId);
         require(owner == msg.sender, "Not an owner of a basket");
-        require(wrapped[msg.sender][_wrapId].locked = true, "Not for sale");
+        require(wrapped[msg.sender][_wrapId].locked == true, "Not for sale");
         delete bidding[msg.sender][_wrapId];
         wrapped[msg.sender][_wrapId].locked = false;
     }
 
-    function updatePrice(uint256 _wrapId) public returns (uint256 basketPrice) {
-
+    function updatePrice(uint256 _wrapId, uint256 _premium) public returns (uint256 basketPrice) {
+        require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
+        require(bidding[msg.sender][_wrapId].onSale == true, "Basket not listed");
+        bool priceUpdate = true;
+        uint256 _priceBasket = priceBasket(_wrapId, priceUpdate);
+        uint256 price = _priceBasket.add(_premium);
+        bidding[msg.sender][_wrapId].price = price;
+        return price;
     }
 
-    function MockLinkFeed() public pure returns(int256) {
-        // Could get real price from mainnet  
-        int256 value = 66666;
-        return(value);
+    function MockLinkFeed(bool update) public pure returns(int256) {
+        if (update == true) {
+            int256 value = 33333;
+            return (value);
+        } else {
+            int256 value = 66666;
+            return(value);
+        }
     }
 
 

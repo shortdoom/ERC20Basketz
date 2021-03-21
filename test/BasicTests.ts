@@ -208,16 +208,45 @@ describe("ErcWrapper", () => {
     console.log("basket priced at", basketPrice2.toString());
   });
 
-  it("Negative cases for Create Order", async function () {
+  it("Negative cases for createOrder, owner operations", async function () {
     const userWrapper = ErcWrapper.connect(user1);
     const user2Wrapper = ErcWrapper.connect(user2);
     const fixedPremium = ethers.utils.parseEther("0.05");
     await expect(userWrapper.createOrder(3, fixedPremium)).to.be.revertedWith("Basket already listed");
     console.log("no doubling orders!")
     await expect(user2Wrapper.createOrder(3, fixedPremium)).to.be.revertedWith("Not an owner of a basket");
-    console.log("only owner can create order!")
+    console.log("only owner of basket can create order!")
   });
 
+  it("Negative cases for createOrder, transfers locked", async function () {
+    const userWrapper = ErcWrapper.connect(user1);
+    await userWrapper.approve(user2.address, 3);
+    await expect(userWrapper.transferFrom(user1.address, user2.address, 3)).to.be.revertedWith("Cannot transfer locked");
+    console.log("user1 cannot transfer basket currently for sale");
+  });
+
+  it("Negative case for fillOrder, not enough funds", async function () {
+    const userWrapper = ErcWrapper.connect(user2);
+    const value = await userWrapper.basketBalance(user1.address, 3);
+    const wrongValue = ethers.utils.parseEther("0.0001"); 
+    await expect(userWrapper.fillOrder(user1.address, 3, {value:wrongValue})).to.be.revertedWith("Not enough funds transfered");
+    console.log("user2 doesnt send enough of the funds!");
+  });
+
+  it("Negative case for fillOrder, basket not for sale", async function () {
+    const userWrapper = ErcWrapper.connect(user1);
+    const toSwap = ethers.utils.parseEther("20");
+    const value = await userWrapper.basketBalance(user1.address, 3);
+    const userTokenA = TokenA.connect(user1);
+    const userTokenB = TokenB.connect(user1);
+    await userTokenB.approve(ErcWrapper.address, toSwap);
+    await userTokenA.approve(ErcWrapper.address, toSwap);
+    // Create another basket, but do not list it
+    await userWrapper.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]); // 5
+    await expect(userWrapper.fillOrder(user1.address, 5, {value})).to.be.revertedWith("Basket not locked for sale");
+    console.log("user2 cannot buy what user1 didnt list!");
+  });
+  
   it("Fill Order", async function () {
     const userWrapper = ErcWrapper.connect(user2);
     const value = await userWrapper.basketBalance(user1.address, 3); 
@@ -225,10 +254,37 @@ describe("ErcWrapper", () => {
     console.log("first order filled by user2")
   });
 
+  it("Negative case for fillOrder, cannot fill already filled", async function () {
+    const userWrapper = ErcWrapper.connect(user2);
+    const value = await userWrapper.basketBalance(user1.address, 3); 
+    await expect(userWrapper.fillOrder(user1.address, 3, {value})).to.be.revertedWith("Basket not locked for sale");
+    console.log("first order filled by user2")
+  });
+
+  it("Negative case for cancelOrder, only owner can cancel", async function () {
+    const userWrapper = ErcWrapper.connect(user2);
+    await expect(userWrapper.cancelOrder(4)).to.be.revertedWith("Not an owner of a basket");
+    console.log("user2 fails to cancel order of user1!");
+  });
+
+  it("Negative case for cancelOrder, cannot cancel unlisted", async function () {
+    const userWrapper = ErcWrapper.connect(user1);
+    await expect(userWrapper.cancelOrder(5)).to.be.revertedWith("Not for sale");
+    console.log("user1 cannot cancel order which doesnt exist!");
+  });
+
   it("Cancel Order", async function () {
     const userWrapper = ErcWrapper.connect(user1);
     await userWrapper.cancelOrder(4);
     console.log("order canceled by user1");
+  });
+
+  it("Update price", async function () {
+    const userWrapper = ErcWrapper.connect(user1);
+    const fixedPremium = ethers.utils.parseEther("0.0661");
+    await userWrapper.createOrder(5, fixedPremium);
+    await userWrapper.updatePrice(5, fixedPremium);
+    console.log("price updated");
   });
 
 });
