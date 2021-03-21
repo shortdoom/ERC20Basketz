@@ -66,19 +66,19 @@ describe("ErcWrapper", () => {
     // Send to contract
     const userWrapper = ErcWrapper.connect(user1);
     await userWrapper.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);
-    console.log('Successful wrapp with allowed');
+    console.log(user1.address, "created wrap!");
 
     // Check balance after sending (N - toSwap)
     const userTokenBalanceA = await TokenA.balanceOf(user1.address);
     const userTokenBalanceB = await TokenB.balanceOf(user1.address);
-    console.log("Balance after minting first Basket");
+    console.log(user1.address, "balance after wraping! (should be 80)");
     console.log("TokenA:", userTokenBalanceA.toString(), "TokenB:", userTokenBalanceB.toString());
 
     // Number of NFT-Indexes assigned to user account
     const userWrapperBalance = await userWrapper.balanceOf(user1.address);
 
-    // This returns len
-    console.log("User1 owns:", userWrapperBalance.toString(), "Basket (should be 1)");
+    // We use wrapId (equal to tokenId from ERC721 also)
+    console.log(user1.address, "owns:", userWrapperBalance.toString(), "basket (should be 1)");
     const wrappedBalance = await userWrapper.wrappedBalance(1);
 
     console.log(
@@ -105,29 +105,30 @@ describe("ErcWrapper", () => {
 
     await expect(userWrapper.wrapper([NotAllowedToken.address, TokenB.address], [toSwap, toSwap])).to.be.revertedWith("No Chainlink Price Feed Available");
     const hasTokens = await userWrapper.balanceOf(user2.address);
-    console.log("Wrap failed (should), Balance unchanged is:", hasTokens.toString());
+    console.log("Wrap failed (should), balance of", user2.address, "is:", hasTokens.toString());
     expect(hasTokens).to.be.equal(0);  
   });
 
   it("Unwrapping", async function () {
-    console.log("Starting wrap with not allowed token");
     const NotAllowedUser = ErcWrapper.connect(user2);
-    console.log("Owner:", user1.address, "NotAllowed:", user2.address);
+    console.log("owner:", user1.address, "notAllowed:", user2.address);
     const showOwner = await ErcWrapper.balanceOf(user2.address);
-    console.log("Balance of Notallowed:", showOwner.toString(), "Should be 0");
+    console.log("balance of notallowed:", showOwner.toString(), "(should be 0)");
 
     // WE KNOW USER2 DOESN'T OWN ANY BASKET AND CANNOT UNWRAP NOT OWNED BASKET
-    await expect(NotAllowedUser.unwrapper(1), "Old owner shouldn't be able to unwrap").to.be.revertedWith("Not an owner of a basket");
-    console.log("Only owner can unwrap (revert)");
+    await expect(NotAllowedUser.unwrapper(1)).to.be.revertedWith("Not an owner of a basket");
+    console.log("Only owner can unwrap (revert)! good!");
 
     // SUCCEEDS AS SHOULD, USER1 UNWRAPS WRAP1 AND ZEROES BALANCE
     const userWrapper = ErcWrapper.connect(user1);
     const basketId = await userWrapper.ownerOf(1);
-    console.log("Owner of basketId 1", basketId.toString());
+    console.log("owner of basketId 1", basketId.toString());
     await expect(userWrapper.unwrapper(1));
     const hasTokens = await userWrapper.balanceOf(user1.address);
-    console.log("Basket unwrapped! Should not own any", hasTokens.toString());
-    expect(hasTokens).to.be.equal(0);  
+    console.log("basket unwrapped! current balance of baskets =", hasTokens.toString());
+    expect(hasTokens).to.be.equal(0);
+    // show token balance of unwrap caller
+
   });
 
   it("Transfer from U1 to U2", async function () {
@@ -149,93 +150,85 @@ describe("ErcWrapper", () => {
 
     // Check User2 Balance
     const userWrapper2 = ErcWrapper.connect(user2);
-    const userNFTBalanceAfterTransfer = await userWrapper2.wrappedBalance(2);
-
-    console.log(
-      "\nBasket ID (should be 2)",
-      userNFTBalanceAfterTransfer.id.toString(),
-      "\nBasket Tokens",
-      userNFTBalanceAfterTransfer.tokens,
-      "\nBasket Tokens Amounts",
-      userNFTBalanceAfterTransfer.amounts.toString(),
-    );
+    console.log("basket transfered from", user1.address, "to", user2.address);
+    const basketBalance = await userWrapper2.balanceOf(user2.address);
+    console.log(basketBalance.toString(), "baskets owned by", user2.address);
   });
 
   it("User1 tries to unwrap already sent Basket", async function () {
     const userWrapper = ErcWrapper.connect(user1);
     await expect(userWrapper.unwrapper(1)).to.be.reverted;
-    console.log("Unwrapping already unwrapped token revert! Good!");
+    console.log("unwrapping already unwrapped token revert! good!");
   });
 
-  it("User1 owns multiple baskets", async function () {
-    const toSwap = ethers.utils.parseEther("20");
+  it("User2 can unwrap after transfer", async function () {
+    // Remember to fix tracking of tokenIds
+    const userWrapper = ErcWrapper.connect(user2);
+    await userWrapper.unwrapper(2);
+    console.log("user2 unwraps basket after transfer! good!");
+  });
+
+  it("Show balances", async function () {
     const userWrapper = ErcWrapper.connect(user1);
+    const b1 = await userWrapper.balanceOf(user1.address);
+    const b2 = await userWrapper.balanceOf(user2.address);
+    console.log("user1 balanceOf (baskets)", b1.toString(), "user2 balanceOf", b2.toString());
+  });
+
+  it("Mint 2 new baskets", async function () {
+    const userWrapper = ErcWrapper.connect(user1);
+    const toSwap = ethers.utils.parseEther("20");
     const userTokenA = TokenA.connect(user1);
     const userTokenB = TokenB.connect(user1);
 
-    // Mints basket 3 & 4
-    await userTokenA.approve(ErcWrapper.address, toSwap);
+    console.log("Minting 2 baskets to user1");
     await userTokenB.approve(ErcWrapper.address, toSwap);
+    await userTokenA.approve(ErcWrapper.address, toSwap);
     await userWrapper.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);
 
-    await userTokenA.approve(ErcWrapper.address, toSwap);
     await userTokenB.approve(ErcWrapper.address, toSwap);
+    await userTokenA.approve(ErcWrapper.address, toSwap);
     await userWrapper.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);
-    
-    const totalBalance = await userWrapper.balanceOf(user1.address);
-    const ownerExample = await userWrapper.ownerOf(3);
-    console.log("Owner balance of Baskets", totalBalance.toString(), "\nOwner of Bakset ID3", ownerExample.toString());
-  
-});
 
-  it("Create order", async function () {
-    const userWrapper = ErcWrapper.connect(user1);
-    let deadline = Date.now() + 300;
-    // _wrapId, _deadline, _priceSlip, _premium
-    // LOCK FOR CREATING ONLY ONE ORDER FOR GIVEN ID!
-    await expect(userWrapper.createOrder(3, deadline, 50000, 10));
-    const value = await userWrapper.basketBalance(user1.address, 3);
-    console.log("Curent basket Price: (should be non-0)", value.toString());
-    console.log("Order created!");
-
-    // Try to transfer basket already locked in Order 
-    await expect(userWrapper.approve(user2.address, 3));
-    await expect(userWrapper.transferFrom(user1.address, user2.address, 3)).to.be.revertedWith("Cannot transfer locked");
-    console.log("Transfer of locked basket fails! Good!")
-
-    // Should try to unwrap now
-    await expect(userWrapper.unwrapper(3)).to.be.revertedWith("Cannot unwrap locked");
-    console.log("Unwrapping of locked basket fails! Good!")
+    const b1 = await userWrapper.balanceOf(user1.address);
+    const b2 = await userWrapper.balanceOf(user2.address);
+    console.log("user1 balanceOf (baskets)", b1.toString(), "user2 balanceOf", b2.toString());
   });
 
-  it("Fill order", async function () {
-    const userWrapper = ErcWrapper.connect(user2);
-    const value = await userWrapper.basketBalance(user1.address, 3);
-    await userWrapper.fillOrder(user1.address, 3, {value});
-    console.log("Order filled!")
+  it("Create Order", async function () {
+    const userWrapper = ErcWrapper.connect(user1);
+    const fixedPremium = ethers.utils.parseEther("0.05");
+    await userWrapper.createOrder(3, fixedPremium);
+    const basketPrice = await userWrapper.basketBalance(user1.address, 3);
+    console.log("basket priced at", basketPrice.toString());
 
-    // Should check balances
-    // Should call Cancel or balance for user1
+    console.log("creating another order to test cancel later");
+    await userWrapper.createOrder(4, fixedPremium);
+    const basketPrice2 = await userWrapper.basketBalance(user1.address, 4);
+    console.log("basket priced at", basketPrice2.toString());
+  });
+
+  it("Negative cases for Create Order", async function () {
+    const userWrapper = ErcWrapper.connect(user1);
+    const user2Wrapper = ErcWrapper.connect(user2);
+    const fixedPremium = ethers.utils.parseEther("0.05");
+    await expect(userWrapper.createOrder(3, fixedPremium)).to.be.revertedWith("Basket already listed");
+    console.log("no doubling orders!")
+    await expect(user2Wrapper.createOrder(3, fixedPremium)).to.be.revertedWith("Not an owner of a basket");
+    console.log("only owner can create order!")
+  });
+
+  it("Fill Order", async function () {
+    const userWrapper = ErcWrapper.connect(user2);
+    const value = await userWrapper.basketBalance(user1.address, 3); 
+    await userWrapper.fillOrder(user1.address, 3, {value});
+    console.log("first order filled by user2")
   });
 
   it("Cancel Order", async function () {
-    const userWrapper = ErcWrapper.connect(user2);
-    let deadline = Date.now() + 300;
-
-    // All wrong structurally
-    await expect(userWrapper.createOrder(3, deadline, 50000, 10));
-    await expect(userWrapper.cancelOrder(3));
-    const value = await userWrapper.basketBalance(user2.address, 3);
-    console.log("Buying Basket 3 for", value.toString());
-
-    const Buyer = ErcWrapper.connect(user1);
-    await expect(Buyer.fillOrder(user2.address, 3, {value})).to.be.revertedWith("Basket not locked for sale");
-    console.log("Can't buy basket with closed order! Good!");
-
-    // Should check balances
-    // Should call Cancel or balance for user1
-
-    // Fundamental problem is that, a) Price isn't updated b) Tracking by wrapId is bad in bidding
+    const userWrapper = ErcWrapper.connect(user1);
+    await userWrapper.cancelOrder(4);
+    console.log("order canceled by user1");
   });
 
 });

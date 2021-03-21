@@ -61,9 +61,8 @@ contract ercWrapper is ERC721, Whitelist {
     }
 
     struct Bid {
-        uint256 deadline;
-        uint256 priceSlip; // Allowed slip from price after posting order
-        uint256 price; // 
+        uint256 price;
+        bool onSale;
     }
 
     modifier backEnd() {
@@ -156,36 +155,22 @@ contract ercWrapper is ERC721, Whitelist {
         delete wrapped[msg.sender][_wrapId];
     }
 
-    function createOrder(uint256 _wrapId, uint256 _deadline, uint256 _priceSlip, uint256 _premium) external {
+    function swap(uint256 _wrapId, address to) public {
+        // _owner.transfer(msg.value);
+        // wrapped[_owner][_wrapId].locked = false;
+        // super._transfer(_owner, msg.sender, _wrapId); // Call ERC721
+        // wrapped[msg.sender][_wrapId] = wrapped[_owner][_wrapId];
+        // delete wrapped[_owner][_wrapId];
+    }
+
+    function createOrder(uint256 _wrapId, uint256 _premium) external {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
+        require(bidding[msg.sender][_wrapId].onSale == false, "Basket already listed");
         wrapped[msg.sender][_wrapId].locked = true; // Cannot transfer & Unwrap now
-        // pricing[msg.sender][_wrapId] = priceBasket(_wrapId); // Sets Initial Price
-        uint256 priceFloor = priceBasket(_wrapId);
-        uint256 premium = _premium;
-        bidding[msg.sender][_wrapId] = Bid({deadline: _deadline, priceSlip: _priceSlip, price: priceFloor});
+        uint256 _priceBasket = priceBasket(_wrapId);
+        uint256 price = _priceBasket.add(_premium);
+        bidding[msg.sender][_wrapId] = Bid({price: price, onSale: true});
     }
-
-    function fillOrder(address payable _owner, uint256 _wrapId) public payable {
-        require(wrapped[_owner][_wrapId].locked = true, "Basket not locked for sale");
-        require(bidding[_owner][_wrapId].price >= msg.value, "Not enough funds transfered");
-        require(bidding[_owner][_wrapId].deadline >= block.timestamp, "Pass deadline"); 
-        // require(bidding[_owner].priceSlip >= msg.value, "Pricing out of bounds"); // This should check function returning correct calculation        
-        
-        _owner.transfer(msg.value);
-        wrapped[_owner][_wrapId].locked = false;
-        super._transfer(_owner, msg.sender, _wrapId); // Call ERC721
-        wrapped[msg.sender][_wrapId] = wrapped[_owner][_wrapId];
-        delete wrapped[_owner][_wrapId];
-    }
-
-    function cancelOrder(uint256 _wrapId) public {
-        address owner = ERC721.ownerOf(_wrapId);
-        require(owner == msg.sender, "Not an owner of a basket");
-        require(wrapped[msg.sender][_wrapId].locked = true, "Not for sale");
-        delete bidding[msg.sender][_wrapId];
-        wrapped[msg.sender][_wrapId].locked = false;
-    }
-
 
     function priceBasket(uint256 _wrapId) public returns (uint256 basketPrice) {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
@@ -199,8 +184,27 @@ contract ercWrapper is ERC721, Whitelist {
         return total;
     }
 
-    function updatePrice(uint256 _wrapId) public returns (uint256 basketPrice) {
+    function fillOrder(address payable _owner, uint256 _wrapId) public payable {
+        require(wrapped[_owner][_wrapId].locked = true, "Basket not locked for sale");
+        require(bidding[_owner][_wrapId].price >= msg.value, "Not enough funds transfered");
         
+        _owner.transfer(msg.value);
+        wrapped[_owner][_wrapId].locked = false;
+        super._transfer(_owner, msg.sender, _wrapId); 
+        wrapped[msg.sender][_wrapId] = wrapped[_owner][_wrapId];
+        delete wrapped[_owner][_wrapId];
+    }
+
+    function cancelOrder(uint256 _wrapId) public {
+        address owner = ERC721.ownerOf(_wrapId);
+        require(owner == msg.sender, "Not an owner of a basket");
+        require(wrapped[msg.sender][_wrapId].locked = true, "Not for sale");
+        delete bidding[msg.sender][_wrapId];
+        wrapped[msg.sender][_wrapId].locked = false;
+    }
+
+    function updatePrice(uint256 _wrapId) public returns (uint256 basketPrice) {
+
     }
 
     function MockLinkFeed() public pure returns(int256) {
