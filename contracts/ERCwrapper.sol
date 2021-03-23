@@ -43,7 +43,7 @@ Buyers pool funds and specify bid vectors (Can they update vectors?)
 5) Gas optimization
  */
 
-contract ercWrapper is ERC721, Whitelist {
+contract ercWrapper is ERC721, Whitelist, HashedTimelockERC721 {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Counters for Counters.Counter;

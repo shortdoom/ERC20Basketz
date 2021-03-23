@@ -327,8 +327,8 @@ describe("HTLC Basket Swap", () => {
     ErcWrapper = await wrapperFactory.deploy([TokenA.address, TokenB.address], feeds);
 
     // Deploy HTLC
-    const HTLCFactory = new HashedTimelockERC721__factory(deployer);
-    HTLC = await HTLCFactory.deploy();
+    // const HTLCFactory = new HashedTimelockERC721__factory(deployer);
+    // HTLC = await HTLCFactory.deploy();
 
     const bufToStr = (b: any) => '0x' + b.toString('hex')
     const sha256 = (x: any) =>
@@ -402,15 +402,17 @@ describe("HTLC Basket Swap", () => {
 
   it("U1 sets up swap with Basket1", async function () {
     const userWrapper = ErcWrapper.connect(user1);
-    const userHTLC = HTLC.connect(user1);
+    // const userHTLC = HTLC.connect(user1);
 
     const timeLock2Sec = Date.now() + 2000;
     const balanceBefore = await userWrapper.balanceOf(user1.address);
     console.log("how many tokens user1 owns before", balanceBefore.toString());
-    await userWrapper.approve(HTLC.address, 1) // approve HTLC for token 1;
+    console.log("Get address:");
+    console.log(ErcWrapper.address);
+    await userWrapper.approve(ErcWrapper.address, 1) // approve HTLC for token 1;
     console.log("approved htlc contract!");
     // receiver, _hashlock, _timelock, _tokenContract, _tokenId
-    const tx = await userHTLC.newContract(user2.address, hash, timeLock2Sec, userWrapper.address, 1);
+    const tx = await userWrapper.newContract(user2.address, hash, timeLock2Sec, userWrapper.address, 1);
     const balanceAfter = await userWrapper.balanceOf(user1.address);
     console.log("how many tokens user1 owns after", balanceAfter.toString());
     let receipt = await tx.wait();
@@ -422,15 +424,15 @@ describe("HTLC Basket Swap", () => {
 
   it("U2 setus up swap with Basket2", async function () {
     const userWrapper = ErcWrapper.connect(user2);
-    const userHTLC = HTLC.connect(user2);
+    // const userHTLC = HTLC.connect(user2);
 
     const timeLock2Sec = Date.now() + 2000;
     const balanceBefore = await userWrapper.balanceOf(user2.address);
     console.log("how many tokens user2 owns before", balanceBefore.toString());
-    await userWrapper.approve(HTLC.address, 2) // approve HTLC for token 2;
+    await userWrapper.approve(ErcWrapper.address, 2) // approve HTLC for token 2;
     console.log("approved htlc contract!");
     // receiver, _hashlock, _timelock, _tokenContract, _tokenId
-    const tx = await userHTLC.newContract(user1.address, hash, timeLock2Sec, userWrapper.address, 2);
+    const tx = await userWrapper.newContract(user1.address, hash, timeLock2Sec, userWrapper.address, 2);
     const balanceAfter = await userWrapper.balanceOf(user2.address);
     console.log("how many tokens user2 owns after", balanceAfter.toString());
     let receipt = await tx.wait();
@@ -442,19 +444,19 @@ describe("HTLC Basket Swap", () => {
 
   it("U1 withdraws", async function () {
     const userWrapper = ErcWrapper.connect(user1);
-    const userHTLC = HTLC.connect(user1);
-    await userHTLC.withdraw(u2contractId, secret);
+    // const userHTLC = HTLC.connect(user1);
+    await userWrapper.withdraw(u2contractId, secret);
     const balanceAfter = await userWrapper.balanceOf(user1.address);
     console.log("withdraw of u2 token to u1, current u1 balance:", balanceAfter.toString());
   });
 
   it("U2 withdraws with secret", async function () {
     const userWrapper = ErcWrapper.connect(user2);
-    const userHTLC = HTLC.connect(user2);
-    const contractArr = await userHTLC.getContract(u2contractId);
+    // const userHTLC = HTLC.connect(user2);
+    const contractArr = await userWrapper.getContract(u2contractId);
     learnedSecret = contractArr[8];
     console.log("secret", learnedSecret);
-    await userHTLC.withdraw(u1contractId, learnedSecret);
+    await userWrapper.withdraw(u1contractId, learnedSecret);
     const balanceAfter = await userWrapper.balanceOf(user2.address);
     console.log("withdraw of u1 token to u2, current u2 balance:", balanceAfter.toString());
   });

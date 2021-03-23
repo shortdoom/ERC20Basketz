@@ -1,8 +1,8 @@
 pragma solidity 0.7.4;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+// import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
-// import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 /**
 * @title Hashed Timelock Contracts (HTLCs) on Ethereum ERC721 tokens.
@@ -55,7 +55,7 @@ contract HashedTimelockERC721 {
         // ensure this contract is approved to transfer the designated token
         // so that it is able to honor the claim request later
         require(
-            ERC721(_token).getApproved(_tokenId) == address(this),
+            IERC721(_token).getApproved(_tokenId) == address(this),
             "The HTLC must have been designated an approved spender for the tokenId"
         );
         _;
@@ -140,7 +140,7 @@ contract HashedTimelockERC721 {
             revert("Contract already exists");
 
         // This contract becomes the temporary owner of the token
-        ERC721(_tokenContract).transferFrom(msg.sender, address(this), _tokenId);
+        IERC721(_tokenContract).transferFrom(msg.sender, address(this), _tokenId);
 
         contracts[contractId] = LockContract(
             msg.sender,
@@ -183,7 +183,7 @@ contract HashedTimelockERC721 {
         LockContract storage c = contracts[_contractId];
         c.preimage = _preimage;
         c.withdrawn = true;
-        ERC721(c.tokenContract).transferFrom(address(this), c.receiver, c.tokenId);
+        IERC721(c.tokenContract).transferFrom(address(this), c.receiver, c.tokenId);
         emit HTLCERC721Withdraw(_contractId);
         return true;
     }
@@ -203,7 +203,7 @@ contract HashedTimelockERC721 {
     {
         LockContract storage c = contracts[_contractId];
         c.refunded = true;
-        ERC721(c.tokenContract).transferFrom(address(this), c.sender, c.tokenId);
+        IERC721(c.tokenContract).transferFrom(address(this), c.sender, c.tokenId);
         emit HTLCERC721Refund(_contractId);
         return true;
     }
