@@ -1,19 +1,18 @@
 import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
-import { Contract } from "ethers";
+import { Bytes, Contract } from "ethers";
 
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { ErcWrapper__factory } from "../typechain";
+import { ErcWrapper__factory, HashedTimelockERC721__factory } from "../typechain";
 
 import ERC20 from "@uniswap/v2-periphery/build/ERC20.json";
-import UniswapV2Router02 from "@uniswap/v2-periphery/build/UniswapV2Router02.json";
-import { ChainId, Token, WETH, Fetcher, Trade, Route, TokenAmount, TradeType, Percent } from '@uniswap/sdk'
-
 
 chai.use(solidity);
 const { expect } = chai;
+
 var fs = require("fs");
+var crypto = require('crypto');
 
 const TOTALSUPPLY = ethers.utils.parseEther("10000");
 
@@ -151,8 +150,8 @@ describe("ErcWrapper", () => {
     // Check User2 Balance
     const userWrapper2 = ErcWrapper.connect(user2);
     console.log("basket transfered from", user1.address, "to", user2.address);
-    const basketBalance = await userWrapper2.balanceOf(user2.address);
-    console.log(basketBalance.toString(), "baskets owned by", user2.address);
+    const basketPrice = await userWrapper2.balanceOf(user2.address);
+    console.log(basketPrice.toString(), "baskets owned by", user2.address);
   });
 
   it("User1 tries to unwrap already sent Basket", async function () {
@@ -199,12 +198,12 @@ describe("ErcWrapper", () => {
     const userWrapper = ErcWrapper.connect(user1);
     const fixedPremium = ethers.utils.parseEther("0.05");
     await userWrapper.createOrder(3, fixedPremium);
-    const basketPrice = await userWrapper.basketBalance(user1.address, 3);
+    const basketPrice = await userWrapper.basketPrice(user1.address, 3);
     console.log("basket priced at", basketPrice.toString());
 
     console.log("creating another order to test cancel later");
     await userWrapper.createOrder(4, fixedPremium);
-    const basketPrice2 = await userWrapper.basketBalance(user1.address, 4);
+    const basketPrice2 = await userWrapper.basketPrice(user1.address, 4);
     console.log("basket priced at", basketPrice2.toString());
   });
 
@@ -227,7 +226,7 @@ describe("ErcWrapper", () => {
 
   it("Negative case for fillOrder, not enough funds", async function () {
     const userWrapper = ErcWrapper.connect(user2);
-    const value = await userWrapper.basketBalance(user1.address, 3);
+    const value = await userWrapper.basketPrice(user1.address, 3);
     const wrongValue = ethers.utils.parseEther("0.0001"); 
     await expect(userWrapper.fillOrder(user1.address, 3, {value:wrongValue})).to.be.revertedWith("Not enough funds transfered");
     console.log("user2 doesnt send enough of the funds!");
@@ -236,7 +235,7 @@ describe("ErcWrapper", () => {
   it("Negative case for fillOrder, basket not for sale", async function () {
     const userWrapper = ErcWrapper.connect(user1);
     const toSwap = ethers.utils.parseEther("20");
-    const value = await userWrapper.basketBalance(user1.address, 3);
+    const value = await userWrapper.basketPrice(user1.address, 3);
     const userTokenA = TokenA.connect(user1);
     const userTokenB = TokenB.connect(user1);
     await userTokenB.approve(ErcWrapper.address, toSwap);
@@ -249,14 +248,14 @@ describe("ErcWrapper", () => {
   
   it("Fill Order", async function () {
     const userWrapper = ErcWrapper.connect(user2);
-    const value = await userWrapper.basketBalance(user1.address, 3); 
+    const value = await userWrapper.basketPrice(user1.address, 3); 
     await userWrapper.fillOrder(user1.address, 3, {value});
     console.log("first order filled by user2")
   });
 
   it("Negative case for fillOrder, cannot fill already filled", async function () {
     const userWrapper = ErcWrapper.connect(user2);
-    const value = await userWrapper.basketBalance(user1.address, 3); 
+    const value = await userWrapper.basketPrice(user1.address, 3); 
     await expect(userWrapper.fillOrder(user1.address, 3, {value})).to.be.revertedWith("Basket not locked for sale");
     console.log("first order filled by user2")
   });
@@ -282,9 +281,185 @@ describe("ErcWrapper", () => {
   it("Update price", async function () {
     const userWrapper = ErcWrapper.connect(user1);
     const fixedPremium = ethers.utils.parseEther("0.0661");
-    await userWrapper.createOrder(5, fixedPremium);
-    await userWrapper.updatePrice(5, fixedPremium);
-    console.log("price updated");
+    const newPremium = ethers.utils.parseEther("0.0991");
+    await expect(userWrapper.createOrder(5, fixedPremium));
+    const firstPrice = await userWrapper.basketPrice(user1.address, 5);
+    console.log("setting first price to", firstPrice.toString());
+    await userWrapper.updatePrice(5, newPremium);
+    const newPrice = await userWrapper.basketPrice(user1.address, 5);
+    console.log("price updated, new price", newPrice.toString());
   });
 
 });
+
+describe("HTLC Basket Swap", () => {
+    let ErcWrapper: Contract;
+    let TokenA: Contract;
+    let TokenB: Contract;
+    let HTLC: Contract;
+    let deployer: SignerWithAddress;
+    let user1: SignerWithAddress;
+    let user2: SignerWithAddress;
+    let u1contractId: Bytes;
+    let u2contractId: Bytes;
+    let u1secret: any;
+    let u2secret: any;
+    let learnedSecret: Bytes;
+    before(async () => {
+      [deployer, user1, user2] = await ethers.getSigners();
+  
+      // Mint two tokens and send to user1 & user2
+      const ERC20Factory = new ethers.ContractFactory(ERC20.abi, ERC20.bytecode, deployer);
+      TokenA = await ERC20Factory.deploy(TOTALSUPPLY);
+      TokenB = await ERC20Factory.deploy(TOTALSUPPLY);
+  
+      // User1 Tokens
+      await TokenA.transfer(user1.address, ethers.utils.parseEther("100"));
+      await TokenB.transfer(user1.address, ethers.utils.parseEther("100"));
+  
+      // User2 Transfer
+      await TokenA.transfer(user2.address, ethers.utils.parseEther("100"));
+      await TokenB.transfer(user2.address, ethers.utils.parseEther("100"));
+  
+      // Deploy ERCWrapper
+      const feeds = await fs.readFileSync("scripts/feeds.txt", "utf-8").split('\n');
+      const wrapperFactory = new ErcWrapper__factory(deployer);
+      ErcWrapper = await wrapperFactory.deploy([TokenA.address, TokenB.address], feeds);
+
+      // Deploy HTLC
+      const HTLCFactory = new HashedTimelockERC721__factory(deployer);
+      HTLC = await HTLCFactory.deploy();
+    });
+  
+  
+    it("Create Basket for U1 and U2 to exchange later", async function () {
+      const toSwap = ethers.utils.parseEther("20");
+
+      // Approve two tokens which will become NFT-Index
+      const userTokenA = TokenA.connect(user1);
+      const userTokenB = TokenB.connect(user1);
+      await userTokenA.approve(ErcWrapper.address, toSwap);
+      await userTokenB.approve(ErcWrapper.address, toSwap);
+
+      const userTokenA2 = TokenA.connect(user2);
+      const userTokenB2 = TokenB.connect(user2);
+      await userTokenA2.approve(ErcWrapper.address, toSwap);
+      await userTokenB2.approve(ErcWrapper.address, toSwap);
+  
+      // U1
+      const userWrapper1 = ErcWrapper.connect(user1);
+      await userWrapper1.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);
+      console.log("created wrap for user1!");
+
+      // U2
+      const userWrapper2 = ErcWrapper.connect(user2);
+      await userWrapper2.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);
+      console.log("created wrap for user2!");
+    });
+
+    it("U1 sets up swap with Basket1", async function () {
+      const userWrapper = ErcWrapper.connect(user1);
+      const userHTLC = HTLC.connect(user1);
+
+      const bufToStr = (b: any) => '0x' + b.toString('hex')
+      const sha256 = (x: any) =>
+        crypto
+          .createHash('sha256')
+          .update(x)
+          .digest()
+      
+      const random32 = () => crypto.randomBytes(32)
+      const isSha256Hash = (hashStr: any) => /^0x[0-9a-f]{64}$/i.test(hashStr)
+      const newSecretHashPair = () => {
+        const secret = random32()
+        const hash = sha256(secret)
+        return {
+          secret: bufToStr(secret),
+          hash: bufToStr(hash),
+        }
+      }
+
+      const hashPair = newSecretHashPair();
+      u1secret = hashPair.secret;
+      const timeLock2Sec = Date.now() + 2000;
+      const balanceBefore = await userWrapper.balanceOf(user1.address);
+      console.log("How many tokens user1 owns before", balanceBefore.toString());
+      await userWrapper.approve(HTLC.address, 1) // approve HTLC for token 1;
+      console.log("approved htlc contract!");
+      // receiver, _hashlock, _timelock, _tokenContract, _tokenId
+      const tx = await userHTLC.newContract(user2.address, hashPair.hash, timeLock2Sec, userWrapper.address, 1);
+      const balanceAfter = await userWrapper.balanceOf(user1.address);
+      console.log("How many tokens user1 owns after", balanceAfter.toString());
+      let receipt = await tx.wait();
+      let details = receipt.events?.filter((x: any) => {return x.event == "HTLCERC721New"});
+      let contractId = details[0].args.contractId;
+      console.log("Contract id", contractId);
+      u1contractId = contractId;
+    });
+
+    it("U2 setus up swap with Basket2", async function () {
+        const userWrapper = ErcWrapper.connect(user2);
+        const userHTLC = HTLC.connect(user2);
+  
+        const bufToStr = (b: any) => '0x' + b.toString('hex')
+        const sha256 = (x: any) =>
+          crypto
+            .createHash('sha256')
+            .update(x)
+            .digest()
+        
+        const random32 = () => crypto.randomBytes(32)
+        const isSha256Hash = (hashStr: any) => /^0x[0-9a-f]{64}$/i.test(hashStr)
+        const newSecretHashPair = () => {
+          const secret = random32()
+          const hash = sha256(secret)
+          return {
+            secret: bufToStr(secret),
+            hash: bufToStr(hash),
+          }
+        }
+  
+        const hashPair = newSecretHashPair();
+        u2secret = hashPair.secret;
+        const timeLock2Sec = Date.now() + 2000;
+        const balanceBefore = await userWrapper.balanceOf(user2.address);
+        console.log("How many tokens user2 owns before", balanceBefore.toString());
+        await userWrapper.approve(HTLC.address, 2) // approve HTLC for token 2;
+        console.log("approved htlc contract!");
+        // receiver, _hashlock, _timelock, _tokenContract, _tokenId
+        const tx = await userHTLC.newContract(user1.address, hashPair.hash, timeLock2Sec, userWrapper.address, 2);
+        const balanceAfter = await userWrapper.balanceOf(user2.address);
+        console.log("How many tokens user2 owns after", balanceAfter.toString());
+        let receipt = await tx.wait();
+        let details = receipt.events?.filter((x: any) => {return x.event == "HTLCERC721New"});
+        let contractId = details[0].args.contractId;
+        console.log("Contract id", contractId);
+        u2contractId = contractId;
+    });
+
+    it("U1 withdraws", async function() {
+      const userWrapper = ErcWrapper.connect(user1);
+      const userHTLC = HTLC.connect(user1);
+      // There is an error in how do we handel hash generator!
+      await userHTLC.withdraw(u2contractId, u2secret);
+      const balanceAfter = await userWrapper.balanceOf(user1.address);
+      console.log("withdraw, current balance:", balanceAfter.toString());
+      // Get secret from U2
+
+      const contractArr = await userHTLC.getContract(u2contractId);
+      learnedSecret = contractArr[8];
+      console.log("secret", learnedSecret);
+    });
+
+    it("U2 withdraws with secret", async function() {
+      const userHTLC = HTLC.connect(user2);
+      // There is an error in how do we handel hash generator!
+      await userHTLC.withdraw(u1contractId, learnedSecret);
+    });
+
+  });
+
+      // const filter = {
+      //   address: u1htlc.address,
+      //   topics: [("HTLCERC721New(bytes32 indexed contractId, address indexed sender, address indexed receiver, address tokenContract, uint256 tokenId, bytes32 hashlock, uint256 timelock)")]
+      // }

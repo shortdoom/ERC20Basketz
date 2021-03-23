@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@chainlink/contracts/src/v0.6/interfaces/AggregatorV3Interface.sol";
 import "./Whitelist.sol";
+import "./HTLC.sol";
 
 /**
 
@@ -70,7 +71,10 @@ contract ercWrapper is ERC721, Whitelist {
         _;
     }
 
-    constructor(address[] memory _tokens, address[] memory _feeds) ERC721("WrappedIndex", "WRAP") Whitelist(_tokens, _feeds) {
+    constructor(address[] memory _tokens, address[] memory _feeds)
+        ERC721("WrappedIndex", "WRAP")
+        Whitelist(_tokens, _feeds)
+    {
         backend = msg.sender;
     }
 
@@ -78,6 +82,8 @@ contract ercWrapper is ERC721, Whitelist {
     // Onchain (can be expensive, at least one loop)
     // Off-chain (no longer permissionless, easier, cheaper)
     // An ideal would be to allow ALL ERC20 and let market price it
+
+    /** Wrapping and unwrapping of ERC20<=>ERC721 */
     function wrapper(address[] memory tokens, uint256[] memory amounts) external returns (uint256) {
         uint256 basketSize = tokens.length;
         require(basketSize <= 10, "Maxiumum  Basket size allowed");
@@ -148,21 +154,23 @@ contract ercWrapper is ERC721, Whitelist {
         uint256 _wrapId
     ) internal override {
         require(wrapped[msg.sender][_wrapId].locked == false, "Cannot transfer locked");
+        wrapped[to][_wrapId] = wrapped[msg.sender][_wrapId];
         super._transfer(from, to, _wrapId);
 
         // NOTE: Change Basket ownership with NFT transfer (token claim/unwrap)
-        wrapped[to][_wrapId] = wrapped[msg.sender][_wrapId];
+        // wrapped[to][_wrapId] = wrapped[msg.sender][_wrapId];
         delete wrapped[msg.sender][_wrapId];
     }
 
-    function swap(uint256 _wrapId, address to) public {
-        // _owner.transfer(msg.value);
-        // wrapped[_owner][_wrapId].locked = false;
-        // super._transfer(_owner, msg.sender, _wrapId); // Call ERC721
-        // wrapped[msg.sender][_wrapId] = wrapped[_owner][_wrapId];
-        // delete wrapped[_owner][_wrapId];
-    }
+    /** Swaping with HTLC(?) */
 
+    /** Bidding mechanism. Temporarily fully on-chain.
+        This may or may not have a sense. Limited liquidity,
+        price update lag, price update costs. The only mitigation
+        currently is setting of _premium over basket price.
+     */
+
+    // NOTE: PriceSlip guard would allow tokens to be canceled less. Just don't execute order below certain price, wait for upswing
     function createOrder(uint256 _wrapId, uint256 _premium) external {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         require(bidding[msg.sender][_wrapId].onSale == false, "Basket already listed");
@@ -170,28 +178,16 @@ contract ercWrapper is ERC721, Whitelist {
         bool priceUpdate = false;
         uint256 _priceBasket = priceBasket(_wrapId, priceUpdate);
         uint256 price = _priceBasket.add(_premium);
-        bidding[msg.sender][_wrapId] = Bid({price: price, onSale: true});
-    }
-
-    function priceBasket(uint256 _wrapId, bool priceUpdate) public returns (uint256 basketPrice) {
-        require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
-        uint256 total;
-        for (uint256 i = 0; i < wrapped[msg.sender][_wrapId].tokens.length; i++) {
-            address feed = getMember(wrapped[msg.sender][_wrapId].tokens[i]);
-            priceFeed = AggregatorV3Interface(feed); // feed is correct, checked with getMember
-            int256 price = MockLinkFeed(priceUpdate);
-            total = total.add(uint256(price));
-        }
-        return total;
+        bidding[msg.sender][_wrapId] = Bid({ price: price, onSale: true });
     }
 
     function fillOrder(address payable _owner, uint256 _wrapId) public payable {
         require(wrapped[_owner][_wrapId].locked == true, "Basket not locked for sale");
         require(msg.value >= bidding[_owner][_wrapId].price, "Not enough funds transfered");
-        
+
         _owner.transfer(msg.value);
         wrapped[_owner][_wrapId].locked = false;
-        super._transfer(_owner, msg.sender, _wrapId); 
+        super._transfer(_owner, msg.sender, _wrapId);
         wrapped[msg.sender][_wrapId] = wrapped[_owner][_wrapId];
         delete wrapped[_owner][_wrapId];
     }
@@ -204,7 +200,19 @@ contract ercWrapper is ERC721, Whitelist {
         wrapped[msg.sender][_wrapId].locked = false;
     }
 
-    function updatePrice(uint256 _wrapId, uint256 _premium) public returns (uint256 basketPrice) {
+    function priceBasket(uint256 _wrapId, bool priceUpdate) public returns (uint256) {
+        require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
+        uint256 total;
+        for (uint256 i = 0; i < wrapped[msg.sender][_wrapId].tokens.length; i++) {
+            address feed = getMember(wrapped[msg.sender][_wrapId].tokens[i]);
+            priceFeed = AggregatorV3Interface(feed); // feed is correct, checked with getMember
+            int256 price = MockLinkFeed(priceUpdate);
+            total = total.add(uint256(price));
+        }
+        return total;
+    }
+
+    function updatePrice(uint256 _wrapId, uint256 _premium) public returns (uint256) {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         require(bidding[msg.sender][_wrapId].onSale == true, "Basket not listed");
         bool priceUpdate = true;
@@ -214,16 +222,17 @@ contract ercWrapper is ERC721, Whitelist {
         return price;
     }
 
-    function MockLinkFeed(bool update) public pure returns(int256) {
+    function MockLinkFeed(bool update) public pure returns (int256) {
         if (update == true) {
             int256 value = 33333;
             return (value);
         } else {
             int256 value = 66666;
-            return(value);
+            return (value);
         }
     }
 
+    /** View functions for wrap and bidding */
 
     function wrappedBalance(uint256 _wrapId)
         public
@@ -238,7 +247,7 @@ contract ercWrapper is ERC721, Whitelist {
         return (_wrapId, wrapped[owner][_wrapId].tokens, wrapped[owner][_wrapId].amounts);
     }
 
-    function basketBalance(address owner, uint256 _wrapId) public view returns (uint256) {
+    function basketPrice(address owner, uint256 _wrapId) public view returns (uint256) {
         return (bidding[owner][_wrapId].price);
     }
 }
