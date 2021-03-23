@@ -372,11 +372,32 @@ describe("HTLC Basket Swap", () => {
     const userWrapper1 = ErcWrapper.connect(user1);
     await userWrapper1.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);
     console.log("created wrap for user1!");
+    const u1balance = await userWrapper1.wrappedBalance(1);
+    console.log("u1 basket balance before swapping");
+    console.log(
+      "Basket ID",
+      u1balance.id.toString(),
+      "\nBasket Tokens",
+      u1balance.tokens,
+      "\nBasket Tokens amounts",
+      u1balance.amounts.toString(),
+    );
 
     // U2
     const userWrapper2 = ErcWrapper.connect(user2);
     await userWrapper2.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);
     console.log("created wrap for user2!");
+    const u2balance = await userWrapper2.wrappedBalance(2);
+    console.log("u2 basket balance before swapping");
+    console.log(
+      "Basket ID",
+      u2balance.id.toString(),
+      "\nBasket Tokens",
+      u2balance.tokens,
+      "\nBasket Tokens amounts",
+      u2balance.amounts.toString(),
+    );
+
   });
 
   it("U1 sets up swap with Basket1", async function () {
@@ -445,6 +466,35 @@ describe("HTLC Basket Swap", () => {
     await expect(ownedTokenId1).to.be.equal(user2.address);
     await expect(ownedTokenId2).to.be.equal(user1.address);
     console.log('users balances after swap match!');
+  });
+
+  it("Check Basket ownership after swap", async function () {
+    const userWrapper1 = ErcWrapper.connect(user1);
+    // Because U1 now owns tokenId 2
+    const u1balance = await userWrapper1.wrappedBalance(2);
+    console.log("u1 basket balance before swapping");
+    console.log(
+      "Basket ID",
+      u1balance.id.toString(),
+      "\nBasket Tokens",
+      u1balance.tokens,
+      "\nBasket Tokens amounts",
+      u1balance.amounts.toString(),
+    );
+
+    // Because U2 now owns tokenId 1
+    const userWrapper2 = ErcWrapper.connect(user2);
+    const u2balance = await userWrapper2.wrappedBalance(1);
+    console.log("u2 basket balance before swapping");
+    console.log(
+      "Basket ID",
+      u2balance.id.toString(),
+      "\nBasket Tokens",
+      u2balance.tokens,
+      "\nBasket Tokens amounts",
+      u2balance.amounts.toString(),
+    );
+
   });
 
 });
