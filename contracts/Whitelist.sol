@@ -17,15 +17,14 @@ contract Whitelist {
         address[] memory tokens,
         address[] memory feeds
     ) {
-        // TokenA is allowed because it's in priceList
-        // I think we should push here...
+
         for (uint256 i = 0; i < tokens.length; i++) {
             priceList[tokens[i]] = feeds[i];
         }
     }
 
     function isAllowed(address token) public view returns (bool) {
-        bool success = priceList[token] != address(0); // T-F if priceList[snxAddress] has non-0
+        bool success = priceList[token] != address(0);
         return(success);
     }
 

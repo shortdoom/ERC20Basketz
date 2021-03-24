@@ -7,6 +7,7 @@ import { solidity } from "ethereum-waffle";
 import { ErcWrapper__factory, HashedTimelockERC721__factory } from "../typechain";
 
 import ERC20 from "@uniswap/v2-periphery/build/ERC20.json";
+import { toUtf8Bytes } from "ethers/lib/utils";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -296,7 +297,8 @@ describe("HTLC Basket Swap", () => {
   let ErcWrapper: Contract;
   let TokenA: Contract;
   let TokenB: Contract;
-  let HTLC: Contract;
+  let TokenC: Contract;
+  let TokenD: Contract;
   let deployer: SignerWithAddress;
   let user1: SignerWithAddress;
   let user2: SignerWithAddress;
@@ -312,19 +314,21 @@ describe("HTLC Basket Swap", () => {
     const ERC20Factory = new ethers.ContractFactory(ERC20.abi, ERC20.bytecode, deployer);
     TokenA = await ERC20Factory.deploy(TOTALSUPPLY);
     TokenB = await ERC20Factory.deploy(TOTALSUPPLY);
+    TokenC = await ERC20Factory.deploy(TOTALSUPPLY);
+    TokenD = await ERC20Factory.deploy(TOTALSUPPLY);
 
     // User1 Tokens
     await TokenA.transfer(user1.address, ethers.utils.parseEther("100"));
     await TokenB.transfer(user1.address, ethers.utils.parseEther("100"));
 
     // User2 Transfer
-    await TokenA.transfer(user2.address, ethers.utils.parseEther("100"));
-    await TokenB.transfer(user2.address, ethers.utils.parseEther("100"));
+    await TokenC.transfer(user2.address, ethers.utils.parseEther("100"));
+    await TokenD.transfer(user2.address, ethers.utils.parseEther("100"));
 
     // Deploy ERCWrapper
     const feeds = await fs.readFileSync("scripts/feeds.txt", "utf-8").split('\n');
     const wrapperFactory = new ErcWrapper__factory(deployer);
-    ErcWrapper = await wrapperFactory.deploy([TokenA.address, TokenB.address], feeds);
+    ErcWrapper = await wrapperFactory.deploy([TokenA.address, TokenB.address, TokenC.address, TokenD.address], feeds);
 
     // Deploy HTLC
     // const HTLCFactory = new HashedTimelockERC721__factory(deployer);
@@ -356,6 +360,7 @@ describe("HTLC Basket Swap", () => {
 
   it("Create Basket for U1 and U2 to exchange later", async function () {
     const toSwap = ethers.utils.parseEther("20");
+    const toSwap2 = ethers.utils.parseEther("11");
 
     // Approve two tokens which will become NFT-Index
     const userTokenA = TokenA.connect(user1);
@@ -363,8 +368,8 @@ describe("HTLC Basket Swap", () => {
     await userTokenA.approve(ErcWrapper.address, toSwap);
     await userTokenB.approve(ErcWrapper.address, toSwap);
 
-    const userTokenA2 = TokenA.connect(user2);
-    const userTokenB2 = TokenB.connect(user2);
+    const userTokenA2 = TokenC.connect(user2);
+    const userTokenB2 = TokenD.connect(user2);
     await userTokenA2.approve(ErcWrapper.address, toSwap);
     await userTokenB2.approve(ErcWrapper.address, toSwap);
 
@@ -385,7 +390,7 @@ describe("HTLC Basket Swap", () => {
 
     // U2
     const userWrapper2 = ErcWrapper.connect(user2);
-    await userWrapper2.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);
+    await userWrapper2.wrapper([TokenC.address, TokenD.address], [toSwap2, toSwap2]);
     console.log("created wrap for user2!");
     const u2balance = await userWrapper2.wrappedBalance(2);
     console.log("u2 basket balance before swapping");
@@ -406,15 +411,15 @@ describe("HTLC Basket Swap", () => {
 
     const timeLock2Sec = Date.now() + 2000;
     const balanceBefore = await userWrapper.balanceOf(user1.address);
-    console.log("how many tokens user1 owns before", balanceBefore.toString());
-    console.log("Get address:");
+    console.log("how many baskets user1 owns before", balanceBefore.toString());
+    console.log("ercwrapper (inlcuding htlc) address:");
     console.log(ErcWrapper.address);
     await userWrapper.approve(ErcWrapper.address, 1) // approve HTLC for token 1;
     console.log("approved htlc contract!");
     // receiver, _hashlock, _timelock, _tokenContract, _tokenId
     const tx = await userWrapper.newContract(user2.address, hash, timeLock2Sec, userWrapper.address, 1);
     const balanceAfter = await userWrapper.balanceOf(user1.address);
-    console.log("how many tokens user1 owns after", balanceAfter.toString());
+    console.log("how many baskets user1 owns after", balanceAfter.toString());
     let receipt = await tx.wait();
     let details = receipt.events?.filter((x: any) => { return x.event == "HTLCERC721New" });
     let contractId = details[0].args.contractId;
@@ -428,13 +433,13 @@ describe("HTLC Basket Swap", () => {
 
     const timeLock2Sec = Date.now() + 2000;
     const balanceBefore = await userWrapper.balanceOf(user2.address);
-    console.log("how many tokens user2 owns before", balanceBefore.toString());
+    console.log("how many baskets user2 owns before", balanceBefore.toString());
     await userWrapper.approve(ErcWrapper.address, 2) // approve HTLC for token 2;
     console.log("approved htlc contract!");
     // receiver, _hashlock, _timelock, _tokenContract, _tokenId
     const tx = await userWrapper.newContract(user1.address, hash, timeLock2Sec, userWrapper.address, 2);
     const balanceAfter = await userWrapper.balanceOf(user2.address);
-    console.log("how many tokens user2 owns after", balanceAfter.toString());
+    console.log("how many baskets user2 owns after", balanceAfter.toString());
     let receipt = await tx.wait();
     let details = receipt.events?.filter((x: any) => { return x.event == "HTLCERC721New" });
     let contractId = details[0].args.contractId;
@@ -448,6 +453,7 @@ describe("HTLC Basket Swap", () => {
     const ownedTokenId2 = await userWrapper.ownerOf(2);
     console.log("owner of basket1", ownedTokenId1);
     console.log("owner of basket2", ownedTokenId2);
+    console.log("should be same");
     const u1balance = await userWrapper.wrappedBalance(1);
     console.log("htlc basket1 balance before swapping");
     console.log(
@@ -459,6 +465,19 @@ describe("HTLC Basket Swap", () => {
       u1balance.amounts.toString(),
     );
 
+  });
+
+  it("U1 tries to transfer basket locked in swap", async function () {
+    const userWrapper = ErcWrapper.connect(user1);
+    await expect(userWrapper.approve(user2.address, 1)).to.be.reverted;
+    console.log("approve fails because basket is already owned by htlc")
+  });
+
+  it("U1 tries to create an order when basket locked in swap", async function() {
+    const userWrapper = ErcWrapper.connect(user1);
+    const fixedPremium = ethers.utils.parseEther("0.05");
+    await expect(userWrapper.createOrder(1, fixedPremium)).to.be.reverted;
+    console.log("createOrder fails because basket is already owned by htlc")
   });
 
   it("U1 withdraws", async function () {

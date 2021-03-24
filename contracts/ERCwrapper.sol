@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@chainlink/contracts/src/v0.6/interfaces/AggregatorV3Interface.sol";
 import "./Whitelist.sol";
-import "./HTLC.sol";
 import "./ControlHTLC.sol";
 
 /**
@@ -16,7 +15,7 @@ import "./ControlHTLC.sol";
 Basic functionality: Wrap & Unwrap ERC20 Baskets stored as NFT
 Extended basic functionality: Ability to Transfer ERC20 Baskets as NFT
 Feature: P2P exchange of Baskets / Buy-Sell Basket for ETH / Swap Basket<>Basket
-Extended feature: Bidding on Baskets
+Extended feature: Auctioning baskets
 Extended feature: Use Basket for a loan on a 3rd party service. Staking function.
 Chainlink role: Current value of the Basket.
 ERC721 URI: Additional data which makes sense to calculate offchain (e.g volatility, performance of basket over time)
@@ -72,14 +71,11 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         _;
     }
 
-    ControlHTLC control;
-
     constructor(address[] memory _tokens, address[] memory _feeds)
         ERC721("WrappedIndex", "WRAP")
         Whitelist(_tokens, _feeds)
     {
         backend = msg.sender;
-        control = new ControlHTLC();
     }
 
     // :::::NOTE:::::
@@ -95,7 +91,6 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         // This is for sure not an optimal solution
         for (uint256 i = 0; i < tokens.length; i++) {
             bool success = isAllowed(tokens[i]);
-            // bool s1 = Whitelist.priceList[tokens[i]];
             require(success, "No Chainlink Price Feed Available");
         }
 
@@ -165,7 +160,7 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         delete wrapped[from][_wrapId]; // could check if swap and then only lock/unlock
     }
 
-    /** Swaping with HTLC(?) */
+    /** Swaping with HTLC */
     function newContract(
         address _receiver,
         bytes32 _hashlock,
@@ -176,9 +171,6 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         contractId = sha256(abi.encodePacked(msg.sender, _receiver, _tokenContract, _tokenId, _hashlock, _timelock));
 
         if (super.haveContract(contractId)) revert("Contract already exists");
-
-        // Alice to ERCwrapper transfers tokenId/wrapIdd
-        // _transfer(msg.sender, address(this), _tokenId);
         ERC721(_tokenContract).transferFrom(msg.sender, address(this), _tokenId);
 
         contracts[contractId] = LockContract(
@@ -206,7 +198,6 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         LockContract storage c = contracts[_contractId];
         c.preimage = _preimage;
         c.withdrawn = true;
-        // _transfer(address(this), c.receiver, c.tokenId);
         ERC721(c.tokenContract).transferFrom(address(this), c.receiver, c.tokenId);
         emit HTLCERC721Withdraw(_contractId);
         return true;
@@ -224,7 +215,6 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         emit HTLCERC721Refund(_contractId);
         return true;
     }
-
 
     /** Bidding mechanism. Temporarily fully on-chain.
         This may or may not have a sense. Limited liquidity,
