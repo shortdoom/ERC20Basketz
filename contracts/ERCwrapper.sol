@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@chainlink/contracts/src/v0.6/interfaces/AggregatorV3Interface.sol";
 import "./Whitelist.sol";
 import "./HTLC.sol";
+import "./ControlHTLC.sol";
 
 /**
 
@@ -43,7 +44,7 @@ Buyers pool funds and specify bid vectors (Can they update vectors?)
 5) Gas optimization
  */
 
-contract ercWrapper is ERC721, Whitelist, HashedTimelockERC721 {
+contract ercWrapper is ERC721, Whitelist, ControlHTLC {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Counters for Counters.Counter;
@@ -71,11 +72,14 @@ contract ercWrapper is ERC721, Whitelist, HashedTimelockERC721 {
         _;
     }
 
+    ControlHTLC control;
+
     constructor(address[] memory _tokens, address[] memory _feeds)
         ERC721("WrappedIndex", "WRAP")
         Whitelist(_tokens, _feeds)
     {
         backend = msg.sender;
+        control = new ControlHTLC();
     }
 
     // :::::NOTE:::::
@@ -153,16 +157,74 @@ contract ercWrapper is ERC721, Whitelist, HashedTimelockERC721 {
         address to,
         uint256 _wrapId
     ) internal override {
-        require(wrapped[msg.sender][_wrapId].locked == false, "Cannot transfer locked");
-        wrapped[to][_wrapId] = wrapped[msg.sender][_wrapId];
+        require(wrapped[from][_wrapId].locked == false, "Cannot transfer locked");
+        wrapped[to][_wrapId] = wrapped[from][_wrapId];
         super._transfer(from, to, _wrapId);
-
         // NOTE: Change Basket ownership with NFT transfer (token claim/unwrap)
-        // wrapped[to][_wrapId] = wrapped[msg.sender][_wrapId];
-        delete wrapped[msg.sender][_wrapId];
+        // Maybe problem is here?
+        delete wrapped[from][_wrapId]; // could check if swap and then only lock/unlock
     }
 
     /** Swaping with HTLC(?) */
+    function newContract(
+        address _receiver,
+        bytes32 _hashlock,
+        uint256 _timelock,
+        address _tokenContract,
+        uint256 _tokenId
+    ) external tokensTransferable(_tokenContract, _tokenId) futureTimelock(_timelock) returns (bytes32 contractId) {
+        contractId = sha256(abi.encodePacked(msg.sender, _receiver, _tokenContract, _tokenId, _hashlock, _timelock));
+
+        if (super.haveContract(contractId)) revert("Contract already exists");
+
+        // Alice to ERCwrapper transfers tokenId/wrapIdd
+        // _transfer(msg.sender, address(this), _tokenId);
+        ERC721(_tokenContract).transferFrom(msg.sender, address(this), _tokenId);
+
+        contracts[contractId] = LockContract(
+            msg.sender,
+            _receiver,
+            _tokenContract,
+            _tokenId,
+            _hashlock,
+            _timelock,
+            false,
+            false,
+            0x0
+        );
+
+        emit HTLCERC721New(contractId, msg.sender, _receiver, _tokenContract, _tokenId, _hashlock, _timelock);
+    }
+
+    function withdraw(bytes32 _contractId, bytes32 _preimage)
+        external
+        contractExists(_contractId)
+        hashlockMatches(_contractId, _preimage)
+        withdrawable(_contractId)
+        returns (bool)
+    {
+        LockContract storage c = contracts[_contractId];
+        c.preimage = _preimage;
+        c.withdrawn = true;
+        // _transfer(address(this), c.receiver, c.tokenId);
+        ERC721(c.tokenContract).transferFrom(address(this), c.receiver, c.tokenId);
+        emit HTLCERC721Withdraw(_contractId);
+        return true;
+    }
+
+    function refund(bytes32 _contractId)
+        external
+        contractExists(_contractId)
+        refundable(_contractId)
+        returns (bool)
+    {
+        LockContract storage c = contracts[_contractId];
+        c.refunded = true;
+        ERC721(c.tokenContract).transferFrom(address(this), c.sender, c.tokenId);
+        emit HTLCERC721Refund(_contractId);
+        return true;
+    }
+
 
     /** Bidding mechanism. Temporarily fully on-chain.
         This may or may not have a sense. Limited liquidity,

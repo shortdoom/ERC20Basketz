@@ -442,6 +442,25 @@ describe("HTLC Basket Swap", () => {
     u2contractId = contractId;
   });
 
+  it("Check HTLC balance before users swap", async function () {
+    const userWrapper = ErcWrapper.connect(user1);
+    const ownedTokenId1 = await userWrapper.ownerOf(1);
+    const ownedTokenId2 = await userWrapper.ownerOf(2);
+    console.log("owner of basket1", ownedTokenId1);
+    console.log("owner of basket2", ownedTokenId2);
+    const u1balance = await userWrapper.wrappedBalance(1);
+    console.log("htlc basket1 balance before swapping");
+    console.log(
+      "Basket ID",
+      u1balance.id.toString(),
+      "\nBasket Tokens",
+      u1balance.tokens,
+      "\nBasket Tokens amounts",
+      u1balance.amounts.toString(),
+    );
+
+  });
+
   it("U1 withdraws", async function () {
     const userWrapper = ErcWrapper.connect(user1);
     // const userHTLC = HTLC.connect(user1);
@@ -474,7 +493,7 @@ describe("HTLC Basket Swap", () => {
     const userWrapper1 = ErcWrapper.connect(user1);
     // Because U1 now owns tokenId 2
     const u1balance = await userWrapper1.wrappedBalance(2);
-    console.log("u1 basket balance before swapping");
+    console.log("u1 basket balance after swapping");
     console.log(
       "Basket ID",
       u1balance.id.toString(),
@@ -487,7 +506,7 @@ describe("HTLC Basket Swap", () => {
     // Because U2 now owns tokenId 1
     const userWrapper2 = ErcWrapper.connect(user2);
     const u2balance = await userWrapper2.wrappedBalance(1);
-    console.log("u2 basket balance before swapping");
+    console.log("u2 basket balance after swapping");
     console.log(
       "Basket ID",
       u2balance.id.toString(),
