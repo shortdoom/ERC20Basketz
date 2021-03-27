@@ -4,6 +4,11 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-wit
 import ERC20 from "@uniswap/v2-periphery/build/ERC20.json";
 import { ErcWrapper__factory} from "../typechain";
 
+import chai from "chai";
+import { solidity } from "ethereum-waffle";
+chai.use(solidity);
+const { expect } = chai;
+
 var fs = require("fs");
 
 const TOTALSUPPLY = ethers.utils.parseEther("10000");
@@ -40,9 +45,9 @@ async function main(): Promise<void> {
   const wrapperFactory = new ErcWrapper__factory(deployer);
   ErcWrapper = await wrapperFactory.deploy([TokenA.address, TokenB.address, TokenC.address, TokenD.address], feeds);
   console.log("Wrapper deployed to: ", ErcWrapper.address);
-  console.log("Deployer address", deployer.address);
 
   await wrapperCreate();
+  await expectRevert();
 
   async function wrapperCreate() {
     console.log("Start wraping");
@@ -53,15 +58,9 @@ async function main(): Promise<void> {
     await userTokenA.approve(ErcWrapper.address, toSwap);
     const userTokenB = TokenB.connect(user1);
     await userTokenB.approve(ErcWrapper.address, toSwap);
-    const userTokenC = TokenC.connect(user2);
-    await userTokenC.approve(ErcWrapper.address, toSwap2);
-    const userTokenD = TokenD.connect(user2);
-    await userTokenD.approve(ErcWrapper.address, toSwap2);
-
     const userWrapper = ErcWrapper.connect(user1);
     await userWrapper.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);
-    const userWrapper2 = ErcWrapper.connect(user2);
-    await userWrapper2.wrapper([TokenC.address, TokenD.address], [toSwap2, toSwap2]);
+
 
     const u1balance = await userWrapper.wrappedBalance(1);
     console.log("u1 basket balance before swapping");
@@ -73,6 +72,12 @@ async function main(): Promise<void> {
       "\nBasket Tokens amounts",
       u1balance.amounts.toString(),
     );
+  }
+
+  async function expectRevert() {
+    const userWrapper = ErcWrapper.connect(user1);
+    await expect(userWrapper.wrappedBalance(2)).to.be.revertedWith("call revert exception");
+    console.log("Error");
   }
 }
 

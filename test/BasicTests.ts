@@ -4,10 +4,9 @@ import { Bytes, Contract } from "ethers";
 
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { ErcWrapper__factory, HashedTimelockERC721__factory } from "../typechain";
+import { ErcWrapper__factory} from "../typechain";
 
 import ERC20 from "@uniswap/v2-periphery/build/ERC20.json";
-import { toUtf8Bytes } from "ethers/lib/utils";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -307,6 +306,7 @@ describe("HTLC Basket Swap", () => {
   let secret: string;
   let hash: string;
   let learnedSecret: Bytes;
+  
   before(async () => {
     [deployer, user1, user2] = await ethers.getSigners();
 

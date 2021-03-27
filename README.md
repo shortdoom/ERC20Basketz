@@ -1,19 +1,127 @@
-# Solidity Template
+# ERC20 Basketz!
 
-My favourite setup for writing Solidity smart contracts.
+Wrap your ERC20 tokens in an ERC721 basket to transfer, swap, sell and more...
 
-- [Hardhat](https://github.com/nomiclabs/hardhat): compile and run the smart contracts on a local development network
-- [TypeChain](https://github.com/ethereum-ts/TypeChain): generate TypeScript types for smart contracts
-- [Ethers](https://github.com/ethers-io/ethers.js/): renowned Ethereum library and wallet implementation
-- [Waffle](https://github.com/EthWorks/Waffle): tooling for writing comprehensive smart contract tests
-- [Solhint](https://github.com/protofire/solhint): linter
-- [Solcover](https://github.com/sc-forks/solidity-coverage) code coverage
-- [Prettier Plugin Solidity](https://github.com/prettier-solidity/prettier-plugin-solidity): code formatter
+### Breakdown of contract functions
 
-This is a GitHub template, which means you can reuse it as many times as you want. You can do that by clicking the "Use this
-template" button at the top of the page.
+* Wrap and unwrap ERC20 Baskets, store any allowed ERC20 as one NFT.
 
-## Usage
+* Compose analytics of a basket (price change, volatility, performance) and return it as NFT metadata.
+
+* Ability to transfer ERC20 Baskets as NFT.
+
+* Use `hashed-timelock-contract`[[HTLC]](https://github.com/ConsenSys/hashed-timelock-contract-ethereum) to swap basket <> basket without 3rd party involvement.
+
+* Sell or auction your Basket for ETH.
+
+* Performance dashboard held as NFT metadata
+
+*More to come...*
+
+### Why this is cool?
+
+* You can now batch transfer your ERC20 as ERC721.
+* You can create a custom token-index composed of any ERC20s and **arbitrage on a demand** for a given composition of tokens.
+* You can swap any basket of tokens for any other basket of tokens, thus change your exposure to the multiple tokens with one transaction.
+* You can instantly sell a basket of N tokens in one transaction.
+* Contract is supposed to be as permissionless as it can in the spirit of crypto finance.
+
+### User perspective
+
+1) Users creates a **wrap** by sending tokens *(min. 2, max. 10)* to `wrapper()` function.
+2) Contract checks if tokens are whitelisted for wrapping. (Avoid low liquidity and unverified tokens!)
+
+    2a) *Function wrappedBackend is a placeholder for a possible change of development path and doing whitelisting offchain.*
+
+3) User **mints** NFT token corresponding to transferred tokens (tokens balance held in mapping `wrapped`).
+4) User can **unwrap** NFT he owns back to his ERC20 tokens.
+5) User can **transfer** NFT and ownership with claim on wrapped Tokens.
+6) User can **swap** any basket with any other basket using a hashed timelock contract, thus no 3rd party involvement is needed.
+7) User can check the balance of his basket using `wrappedBalance()`.
+8) Contract uses Chainlink ethereum price feeds to calculate a value of the Basket.
+
+### Chainlink price feeds role
+
+***NOTE FOR PRE-ALPHA VERSION***: *Currently contract performs all Link related actions on-chain which is not the most optimal solution gas-wise. A large part of operations involving price tracking of a baskets and facilitating p2p exchange will be made by an off-chain scripts*
+
+**Basket creation**
+
+To make sure baskets are created only with verified tokens and to avoid fat finger mistakes we leverage Chainlink price feeds as a conditional check when creating basket. Only tokens tracked by Chainlink are allowed to exist in a basket.
+
+**Basket pricing**
+
+Because the contract allows swaps and selling of a basket we need to know the real value of the basket at current time. Users can set their premium over real price returned by Chainlink price feeds.
+
+### Current gas costs, non-optimized.
+
+![Gas used in tests](gas_cost.png)
+
+### Tests output
+
+````html
+  ErcWrapper
+
+    ✓ Standard wrapping
+    ✓ Wrapping only from allowed list
+    ✓ Unwrapping
+    ✓ Transfer from U1 to U2
+    ✓ User1 tries to unwrap already sent Basket
+    ✓ User2 can unwrap after transfer
+    ✓ Show balances
+    ✓ Mint 2 new baskets
+    ✓ Create Order
+         no doubling orders!
+         only the owner of the basket can create an order!
+    ✓ Negative cases for createOrder, owner operations
+         user1 cannot transfer basket currently for sale
+    ✓ Negative cases for createOrder, transfers locked
+         user2 doesnt send enough of the funds!
+    ✓ Negative case for fillOrder, not enough funds
+         user2 cannot buy what user1 didnt list!
+    ✓ Negative case for fillOrder, basket not for sale
+    ✓ Fill Order
+    ✓ Negative case for fillOrder, cannot fill already filled
+    ✓ Negative case for cancelOrder, only owner can cancel
+    ✓ Negative case for cancelOrder, cannot cancel unlisted
+    ✓ Cancel Order
+    ✓ Update price
+
+  HTLC Basket Swap
+
+    ✓ Create Basket for U1 and U2 to exchange later
+    ✓ U1 sets up swap with Basket1
+    ✓ U2 sets up swap with Basket2
+    ✓ Check HTLC balance before users swap
+         approve fails because basket is already owned by htlc
+    ✓ U1 tries to transfer basket locked in swap
+         createOrder fails because basket is already owned by htlc
+    ✓ U1 tries to create an order when basket locked in swap
+    ✓ U1 withdraws
+    ✓ U2 withdraws with secret
+         users balances after swap match!
+    ✓ Check balances
+    ✓ Check Basket ownership after swap
+````
+
+### To-do
+
+0. Security. Currently it's just a PoC.
+1. Create a backend API server and connect it to ERC721 metadata.
+2. Use ERC721 metadata to facilitate selling of baskets for ETH while keeping gas costs low.
+3. Backend matching script for selling of baskets for ETH.
+4. Create UI, duh.
+5. Currently we only check for most basic cases in tests (29 tests in total). Write more tests.
+7. Access control, access control, access control.
+6. Add ability for loaning against the basket! (A very big overhead for a solo project, but doable).
+8. Deployment scripts are just scaffold for the time being.
+
+### Pre-alpha general notes
+
+1. Currently we load `tokens.txt` and `feeds.txt` to execute a contract with `Whitelist.sol` enabled. Those files will hold mainnet tokens addresses and Chainlink feeds corresponding to those addresses.
+2. Bidding mechanism will be moved off-chain in a big part to save gas costs.
+3. `MockLinkFeed()` is a placeholder function to check if the price is updated.
+
+## How to run
 
 ### Pre Requisites
 
@@ -31,50 +139,8 @@ Compile the smart contracts with Hardhat:
 $ yarn compile
 ```
 
-### TypeChain
-
-Compile the smart contracts and generate TypeChain artifacts:
+### Run tests
 
 ```sh
-$ yarn typechain
-```
-
-### Lint Solidity
-
-Lint the Solidity code:
-
-```sh
-$ yarn lint:sol
-```
-
-### Lint TypeScript
-
-Lint the TypeScript code:
-
-```sh
-$ yarn lint:ts
-```
-
-### Test
-
-Run the Mocha tests:
-
-```sh
-$ yarn test
-```
-
-### Coverage
-
-Generate the code coverage report:
-
-```sh
-$ yarn coverage
-```
-
-### Clean
-
-Delete the smart contract artifacts, the coverage reports and the Hardhat cache:
-
-```sh
-$ yarn clean
+$ yarn tests
 ```

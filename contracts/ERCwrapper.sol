@@ -19,28 +19,6 @@ Extended feature: Auctioning baskets
 Extended feature: Use Basket for a loan on a 3rd party service. Staking function.
 Chainlink role: Current value of the Basket.
 ERC721 URI: Additional data which makes sense to calculate offchain (e.g volatility, performance of basket over time)
-
-Contract should be fully ERC721 capable.
-
-1) Users approves and sends tokens (min. 2, max. 10)
-2) Contract checks if tokens are whitelisted for wrapping
-    2a) Function wrappedBackend is a placeholder for a possible change of development path and doing whitelisting offchain
-3) User wrappedBalance incremented, NFT token coresponding to balance minted (mapping `wrapped`)
-4) User can unwrap NFT he owns back to his ERC20 tokens.
-5) User can transfer (trade*) NFT and ownership of claim on wrapped Tokens
-6) User can check balance of his basket
-7) Contract uses chainlink Ethereum Price Feeds to calculate value of the Basket (explains also limits on tokens in Basket)
-
-Current thoughts:
-
-Reversed Auto Matching
-Buyers pool funds and specify bid vectors (Can they update vectors?)
-
-1) Appropriate types for storage variables (price feeds & user balance)
-2) Access control to functions (currently require, limited modifiers)
-3) Loops avoidance
-4) Contract structure is chaotic (Factory pattern?)
-5) Gas optimization
  */
 
 contract ercWrapper is ERC721, Whitelist, ControlHTLC {
@@ -81,7 +59,7 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
     // :::::NOTE:::::
     // Onchain (can be expensive, at least one loop)
     // Off-chain (no longer permissionless, easier, cheaper)
-    // An ideal would be to allow ALL ERC20 and let market price it
+    // An ideal would be to allow ALL ERC20 and let market price it, but that's not happening :)
 
     /** Wrapping and unwrapping of ERC20<=>ERC721 */
     function wrapper(address[] memory tokens, uint256[] memory amounts) external returns (uint256) {
@@ -104,7 +82,7 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         uint256 wrapId = _wrapID.current();
         wrapped[msg.sender][wrapId] = UserIndex({ tokens: tokens, amounts: amounts, locked: false });
         _mint(msg.sender, wrapId);
-        // NOTE: URI. Maybe off-chain stats, lightweight analysis of basket price change, volatility grade, dashboard for portfolio etc.
+        // NOTE: URI. Off-chain stats, lightweight analysis of basket price change, volatility grade, dashboard for portfolio etc.
 
         return wrapId;
     }
@@ -156,7 +134,6 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         wrapped[to][_wrapId] = wrapped[from][_wrapId];
         super._transfer(from, to, _wrapId);
         // NOTE: Change Basket ownership with NFT transfer (token claim/unwrap)
-        // Maybe problem is here?
         delete wrapped[from][_wrapId]; // could check if swap and then only lock/unlock
     }
 
@@ -228,6 +205,8 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         require(bidding[msg.sender][_wrapId].onSale == false, "Basket already listed");
         wrapped[msg.sender][_wrapId].locked = true; // Cannot transfer & Unwrap now
         bool priceUpdate = false;
+
+        // priceBasket functions on-chain is expensive, chainlink price feed can be used off-chain
         uint256 _priceBasket = priceBasket(_wrapId, priceUpdate);
         uint256 price = _priceBasket.add(_premium);
         bidding[msg.sender][_wrapId] = Bid({ price: price, onSale: true });
