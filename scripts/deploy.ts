@@ -42,7 +42,7 @@ async function main(): Promise<void> {
   console.log("Wrapper deployed to: ", ErcWrapper.address);
   console.log("Deployer address", deployer.address);
 
-  await wrapperCreate();
+  // await wrapperCreate();
 
   async function wrapperCreate() {
     console.log("Start wraping");

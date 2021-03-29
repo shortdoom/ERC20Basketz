@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 import { Contract, ContractFactory } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import ERC20 from "@uniswap/v2-periphery/build/ERC20.json";
-import { ErcWrapper__factory} from "../typechain";
+import { ErcWrapper__factory} from "../../typechain";
 
 import chai from "chai";
 import { solidity } from "ethereum-waffle";

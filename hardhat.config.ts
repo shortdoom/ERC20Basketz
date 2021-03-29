@@ -53,7 +53,7 @@ function createTestnetConfig(network: keyof typeof chainIds): NetworkUserConfig 
 }
 
 const config: HardhatUserConfig = {
-  defaultNetwork: "hardhat",
+  defaultNetwork: "rinkeby",
   networks: {
     hardhat: {
       accounts: {
