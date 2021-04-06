@@ -1,7 +1,6 @@
 import { ethers } from "hardhat";
 import { Contract, ContractFactory } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
-import ERC20 from "@uniswap/v2-periphery/build/ERC20.json";
 const hre = require("hardhat");
 
 var fs = require("fs");
@@ -33,7 +32,7 @@ async function main(): Promise<void> {
     [deployer, user1, user2] = await ethers.getSigners();
 
     // Connect user1 to TokenA & TokenB
-    //   console.log(await hre.artifacts.getArtifactPaths());
+
     const artifact = await hre.artifacts.readArtifact("MockToken");
     const abi = artifact.abi;
     TokenA = new ethers.Contract("0x585477b415Ea1Bc88ABcA26c32755952CF24C631", abi, user1);
@@ -45,15 +44,18 @@ async function main(): Promise<void> {
     const wAbi = wArtifcat.abi;
     ErcWrapper = new ethers.Contract("0x1F6cF4780540D2E829964d0851146feaeA686827", wAbi, user1);
 
-    // await getTokens();
+    /** Uncomment depending on what action with smart contract you want to perform */
+
+    await getTokens();
     // await getBalance();
-    await wrapMock();
+    // await wrapMock();
     // await wrapBalance();
     // await transferWrap();
     // await unwrapTransfered();
 
     async function getTokens() {
         const value = ethers.utils.parseEther("0.01");
+        await TokenA.deposit({ value });
         await TokenB.deposit({ value });
     }
 
