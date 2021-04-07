@@ -13,6 +13,8 @@ import "solidity-coverage";
 
 import "hardhat-gas-reporter"
 
+import "@nomiclabs/hardhat-etherscan";
+
 const chainIds = {
   ganache: 1337,
   goerli: 5,
@@ -92,6 +94,9 @@ const config: HardhatUserConfig = {
   },
   mocha: {
     timeout: 200000
+  },
+  etherscan: {
+    apiKey: "YSAS5MN3UYP7C1GTSPKZPWCYFIB2H97M8F"
   }
 };
 

@@ -29,38 +29,19 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
     Counters.Counter private _wrapID;
     AggregatorV3Interface internal priceFeed;
 
-    // Event for wrapper
-    event BasketCreated(
-        address owner,
-        uint256 wrapId,
-        address[] tokens,
-        uint256[] amounts
-    );
-    // Event for unwrapper
-    event BasketUnwraped(
-        address owner,
-        uint256 wrapId
-    );
+    // // Event for wrapper
+    // event BasketCreated(address owner, uint256 wrapId, address[] tokens, uint256[] amounts);
+    // // Event for unwrapper
+    // event BasketUnwraped(address owner, uint256 wrapId);
 
-    // Event for createOrder
-    event OrderCreated(
-        address owner,
-        uint256 wrapId,
-        uint256 premium
-    );
+    // // Event for createOrder
+    // event OrderCreated(address owner, uint256 wrapId, uint256 price, uint256 premium);
 
-    // Event for fillOrder
-    event OrderFilled(
-        address owner,
-        address newOwner,
-        uint256 wrapId
-    );
+    // // Event for fillOrder
+    // event OrderFilled(address owner, address newOwner, uint256 wrapId);
 
-    // Event for cancelOrder
-    event OrderCancelled(
-        address owner,
-        uint256 wrapId
-    );
+    // // Event for cancelOrder
+    // event OrderCancelled(address owner, uint256 wrapId);
 
     address private backend;
     mapping(address => mapping(uint256 => UserIndex)) public wrapped;
@@ -117,10 +98,8 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         _mint(msg.sender, wrapId);
         // NOTE: URI. Off-chain stats, lightweight analysis of basket price change, volatility grade, dashboard for portfolio etc.
 
+        // emit BasketCreated(msg.sender, wrapId, tokens, amounts);
         return wrapId;
-
-        emit BasketCreated(msg.sender, wrapId, tokens, amounts);
-
     }
 
     function wrapperBackend(address[] memory tokens, uint256[] memory amounts) public backEnd returns (uint256) {
@@ -159,7 +138,7 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
 
         delete wrapped[msg.sender][_wrapId];
         _burn(_wrapId);
-        emit BasketUnwraped(msg.sender, _wrapId);
+        // emit BasketUnwraped(msg.sender, _wrapId);
     }
 
     function _transfer(
@@ -217,12 +196,7 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         return true;
     }
 
-    function refund(bytes32 _contractId)
-        external
-        contractExists(_contractId)
-        refundable(_contractId)
-        returns (bool)
-    {
+    function refund(bytes32 _contractId) external contractExists(_contractId) refundable(_contractId) returns (bool) {
         LockContract storage c = contracts[_contractId];
         c.refunded = true;
         ERC721(c.tokenContract).transferFrom(address(this), c.sender, c.tokenId);
@@ -241,13 +215,12 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         require(bidding[msg.sender][_wrapId].onSale == false, "Basket already listed");
         wrapped[msg.sender][_wrapId].locked = true; // Cannot transfer & Unwrap now
-        bool priceUpdate = false;
 
         // priceBasket functions on-chain is expensive, chainlink price feed can be used off-chain
-        uint256 _priceBasket = priceBasket(_wrapId, priceUpdate);
+        uint256 _priceBasket = priceBasket(_wrapId);
         uint256 price = _priceBasket.add(_premium);
         bidding[msg.sender][_wrapId] = Bid({ price: price, onSale: true });
-        emit OrderCreated(msg.sender, _wrapId, _premium);
+        // emit OrderCreated(msg.sender, _wrapId, price, _premium);
     }
 
     function fillOrder(address payable _owner, uint256 _wrapId) public payable {
@@ -259,7 +232,7 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         super._transfer(_owner, msg.sender, _wrapId);
         wrapped[msg.sender][_wrapId] = wrapped[_owner][_wrapId];
         delete wrapped[_owner][_wrapId];
-        emit OrderFilled(_owner, msg.sender, _wrapId);
+        // emit OrderFilled(_owner, msg.sender, _wrapId);
     }
 
     function cancelOrder(uint256 _wrapId) public {
@@ -268,16 +241,20 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         require(wrapped[msg.sender][_wrapId].locked == true, "Not for sale");
         delete bidding[msg.sender][_wrapId];
         wrapped[msg.sender][_wrapId].locked = false;
-        emit OrderCancelled(msg.sender, _wrapId);
+        // emit OrderCancelled(msg.sender, _wrapId);
     }
 
-    function priceBasket(uint256 _wrapId, bool priceUpdate) public returns (uint256) {
+    function priceBasket(uint256 _wrapId) public returns (uint256) {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         uint256 total;
         for (uint256 i = 0; i < wrapped[msg.sender][_wrapId].tokens.length; i++) {
             address feed = getMember(wrapped[msg.sender][_wrapId].tokens[i]);
             priceFeed = AggregatorV3Interface(feed); // feed is correct, checked with getMember
-            int256 price = MockLinkFeed(priceUpdate);
+            // NOTE: This means chainlink gets price on-chain, should be moved off chain
+            // NOTE: This also makes BasicTests fail because you can get price only from rinkeby and not local hardhat
+            // int256 price = MockLinkFeed(priceUpdate);
+            (uint80 roundID, int256 price, uint256 startedAt, uint256 timeStamp, uint80 answeredInRound) =
+                priceFeed.latestRoundData();
             total = total.add(uint256(price));
         }
         return total;
@@ -286,8 +263,7 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
     function updatePrice(uint256 _wrapId, uint256 _premium) public returns (uint256) {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         require(bidding[msg.sender][_wrapId].onSale == true, "Basket not listed");
-        bool priceUpdate = true;
-        uint256 _priceBasket = priceBasket(_wrapId, priceUpdate);
+        uint256 _priceBasket = priceBasket(_wrapId);
         uint256 price = _priceBasket.add(_premium);
         bidding[msg.sender][_wrapId].price = price;
         return price;

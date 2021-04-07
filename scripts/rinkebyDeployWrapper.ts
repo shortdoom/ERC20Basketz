@@ -9,16 +9,13 @@ var fs = require("fs");
 const TOTALSUPPLY = ethers.utils.parseEther("10000");
 
 /**
- * Wrapper deployed to:  0x1F6cF4780540D2E829964d0851146feaeA686827
+ * Wrapper deployed to:  0x468a4D465cb4693306359d0D1bFE0A8E8337ba42
  * Deployer address 0xc3f8e4bC305dcaAbd410b220E0734d4DeA7C0bc9
+ * npx hardhat verify --network rinkeby --constructor-args scripts/arguments.js 0x468a4D465cb4693306359d0D1bFE0A8E8337ba42
  */
 
 async function main(): Promise<void> {
   let ErcWrapper: Contract;
-  let TokenA: Contract;
-  let TokenB: Contract;
-  let TokenC: Contract;
-  let TokenD: Contract;
   let deployer: SignerWithAddress;
   let user1: SignerWithAddress;
   let user2: SignerWithAddress;
@@ -36,9 +33,6 @@ async function main(): Promise<void> {
 
   // Rinkeby has only USD feeds
   // Remember to also use RINKEBY tokens address
-  // SNX - https://docs.synthetix.io/integrations/testnets/
-  // LINK - https://docs.chain.link/docs/link-token-contracts
-  // Ech, so just deploy your own ERC20 and give ability to mint, then - point feeds to those addresses
   ErcWrapper = await wrapperFactory.deploy(tokens, feeds);
   console.log("Wrapper deployed to: ", ErcWrapper.address);
   console.log("Deployer address", deployer.address);

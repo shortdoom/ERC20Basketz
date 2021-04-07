@@ -6,12 +6,12 @@ const hre = require("hardhat");
 var fs = require("fs");
 
 /**
- * Wrapper deployed to:  0x1F6cF4780540D2E829964d0851146feaeA686827
+ * Wrapper deployed to:  0x192874ecc528Bda7C70B2109FcE581F47BAf5DD7
  * Deployer address 0xc3f8e4bC305dcaAbd410b220E0734d4DeA7C0bc9
- * SNX tokA: 0x585477b415Ea1Bc88ABcA26c32755952CF24C631
- * ZRX tokB: 0xa30000D7B0B6b645FAAB3931C02320649f6Bee23
- * BAT tokC: 0x468C26d86c614cC3d8Eb8cFd89D5607f79D46289
- * LINK tokD: 0x9C35eb2Ddf340AD3ac051455ea26D44e1ed87DC9
+ * SNX tokA: 0x220b45711340265481ACfF4302b5F0e17011503f
+   ZRX tokB: 0xfC74e8cb33D36A5b9d6753934549763ddB769BCf
+   BAT tokC: 0x26611b182856eDb22883F54583dEA00Fe641AB1A
+ * LINK tokD: 0x95d0455390aD9fC57F1DA4525151A63bB407BCf8
  * Todo:
  *      Name Mocks Differently (shadow real rinkebyOracle names tSNX)
  *      Verified Contract for ease
@@ -31,32 +31,44 @@ async function main(): Promise<void> {
 
     [deployer, user1, user2] = await ethers.getSigners();
 
-    // Connect user1 to TokenA & TokenB
+    // Connect user1 to TokenA, TokenB, TokenC & TokenD
 
-    const artifact = await hre.artifacts.readArtifact("MockToken");
-    const abi = artifact.abi;
-    TokenA = new ethers.Contract("0x585477b415Ea1Bc88ABcA26c32755952CF24C631", abi, user1);
-    TokenB = new ethers.Contract("0xa30000D7B0B6b645FAAB3931C02320649f6Bee23", abi, user1);
-    TokenC = new ethers.Contract("0x468C26d86c614cC3d8Eb8cFd89D5607f79D46289", abi, user1);
-    TokenD = new ethers.Contract("0x9C35eb2Ddf340AD3ac051455ea26D44e1ed87DC9", abi, user1);
+    const artifactA = await hre.artifacts.readArtifact("MockTokenA");
+    const artifactB = await hre.artifacts.readArtifact("MockTokenB");
+    const artifactC = await hre.artifacts.readArtifact("MockTokenC");
+    const artifactD = await hre.artifacts.readArtifact("MockTokenD");
+    const abiA = artifactA.abi;
+    const abiB = artifactB.abi;
+    const abiC = artifactC.abi;
+    const abiD = artifactD.abi;
+
+    TokenA = new ethers.Contract("0x220b45711340265481ACfF4302b5F0e17011503f", abiA, user1);
+    TokenB = new ethers.Contract("0xfC74e8cb33D36A5b9d6753934549763ddB769BCf", abiB, user1);
+    TokenC = new ethers.Contract("0x26611b182856eDb22883F54583dEA00Fe641AB1A", abiC, user1);
+    TokenD = new ethers.Contract("0x95d0455390aD9fC57F1DA4525151A63bB407BCf8", abiD, user1);
 
     const wArtifcat = await hre.artifacts.readArtifact("ercWrapper");
     const wAbi = wArtifcat.abi;
-    ErcWrapper = new ethers.Contract("0x1F6cF4780540D2E829964d0851146feaeA686827", wAbi, user1);
+    ErcWrapper = new ethers.Contract("0x468a4D465cb4693306359d0D1bFE0A8E8337ba42", wAbi, user1);
 
     /** Uncomment depending on what action with smart contract you want to perform */
 
-    await getTokens();
+    // await getTokens();
     // await getBalance();
-    // await wrapMock();
+    await wrapMock();
     // await wrapBalance();
     // await transferWrap();
     // await unwrapTransfered();
+
+    // await createOrderBasket();
+    // await fillOrderBasket();
+    // await cancelOrderBasket();
 
     async function getTokens() {
         const value = ethers.utils.parseEther("0.01");
         await TokenA.deposit({ value });
         await TokenB.deposit({ value });
+        console.log("tokA and tokB transfered to user1");
     }
 
     async function getBalance() {
@@ -65,11 +77,12 @@ async function main(): Promise<void> {
     }
 
     async function wrapMock() {
-        const toSwap = ethers.utils.parseEther("1");
+        const toSwap = ethers.utils.parseEther("0.1");
 
         // Approve two tokens which will become NFT-Index
         await TokenA.approve(ErcWrapper.address, toSwap);
         await TokenB.approve(ErcWrapper.address, toSwap);
+        console.log("Tokens approved");
     
         // Send to contract
         await ErcWrapper.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);

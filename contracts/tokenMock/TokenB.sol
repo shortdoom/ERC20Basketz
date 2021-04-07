@@ -3,9 +3,9 @@ pragma solidity 0.7.4;
 
 import "hardhat/console.sol";
 
-contract MockToken {
-    string public name     = "Mocked Token";
-    string public symbol   = "MOCK";
+contract MockTokenB {
+    string public name     = "Mocked TokenB";
+    string public symbol   = "bMOCK";
     uint8  public decimals = 18;
 
     event  Approval(address indexed src, address indexed guy, uint wad);
