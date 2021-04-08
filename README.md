@@ -25,10 +25,15 @@ All contracts can be found on kovan network.
 SNX tokA means that contract is using SNX/ETH Chainlink price feed for a tokA mock contract. 
 
  Wrapper deployed to: 0xac92c3eCEF51276f8F9154e94A55103D2341dE0A
+
  Deployer address 0xc3f8e4bC305dcaAbd410b220E0734d4DeA7C0bc9
+
  SNX tokA: 0x468C26d86c614cC3d8Eb8cFd89D5607f79D46289
+
  ZRX tokB: 0x9C35eb2Ddf340AD3ac051455ea26D44e1ed87DC9
+
  BAT tokC: 0x1F6cF4780540D2E829964d0851146feaeA686827
+ 
  LINK tokD: 0x7aAE0b58df51A346182a11294e4Af42EEB3dA4c0
 
  ABI data can be found in folder abis
