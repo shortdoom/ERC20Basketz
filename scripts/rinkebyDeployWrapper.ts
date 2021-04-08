@@ -9,9 +9,10 @@ var fs = require("fs");
 const TOTALSUPPLY = ethers.utils.parseEther("10000");
 
 /**
- * Wrapper deployed to:  0x468a4D465cb4693306359d0D1bFE0A8E8337ba42
+ * Wrapper deployed to:  0x95d0455390aD9fC57F1DA4525151A63bB407BCf8
  * Deployer address 0xc3f8e4bC305dcaAbd410b220E0734d4DeA7C0bc9
- * npx hardhat verify --network rinkeby --constructor-args scripts/arguments.js 0x468a4D465cb4693306359d0D1bFE0A8E8337ba42
+ * npx hardhat verify --network kovan --constructor-args scripts/arguments.js 0x95d0455390aD9fC57F1DA4525151A63bB407BCf8
+ * https://kovan.etherscan.io/address/0x95d0455390aD9fC57F1DA4525151A63bB407BCf8#code
  */
 
 async function main(): Promise<void> {

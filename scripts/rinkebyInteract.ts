@@ -6,12 +6,12 @@ const hre = require("hardhat");
 var fs = require("fs");
 
 /**
- * Wrapper deployed to:  0x192874ecc528Bda7C70B2109FcE581F47BAf5DD7
+ * Wrapper deployed to:  0x3Ce6d53686Fcc3b74b22Cbd27Da26EEc9d0bd281
  * Deployer address 0xc3f8e4bC305dcaAbd410b220E0734d4DeA7C0bc9
- * SNX tokA: 0x220b45711340265481ACfF4302b5F0e17011503f
-   ZRX tokB: 0xfC74e8cb33D36A5b9d6753934549763ddB769BCf
-   BAT tokC: 0x26611b182856eDb22883F54583dEA00Fe641AB1A
- * LINK tokD: 0x95d0455390aD9fC57F1DA4525151A63bB407BCf8
+  SNX tokA: 0x468C26d86c614cC3d8Eb8cFd89D5607f79D46289
+  ZRX tokB: 0x9C35eb2Ddf340AD3ac051455ea26D44e1ed87DC9
+  BAT tokC: 0x1F6cF4780540D2E829964d0851146feaeA686827
+  LINK tokD: 0x7aAE0b58df51A346182a11294e4Af42EEB3dA4c0
  * Todo:
  *      Name Mocks Differently (shadow real rinkebyOracle names tSNX)
  *      Verified Contract for ease
@@ -42,20 +42,20 @@ async function main(): Promise<void> {
     const abiC = artifactC.abi;
     const abiD = artifactD.abi;
 
-    TokenA = new ethers.Contract("0x220b45711340265481ACfF4302b5F0e17011503f", abiA, user1);
-    TokenB = new ethers.Contract("0xfC74e8cb33D36A5b9d6753934549763ddB769BCf", abiB, user1);
-    TokenC = new ethers.Contract("0x26611b182856eDb22883F54583dEA00Fe641AB1A", abiC, user1);
-    TokenD = new ethers.Contract("0x95d0455390aD9fC57F1DA4525151A63bB407BCf8", abiD, user1);
+    TokenA = new ethers.Contract("0x468C26d86c614cC3d8Eb8cFd89D5607f79D46289", abiA, user1);
+    TokenB = new ethers.Contract("0x9C35eb2Ddf340AD3ac051455ea26D44e1ed87DC9", abiB, user1);
+    TokenC = new ethers.Contract("0x1F6cF4780540D2E829964d0851146feaeA686827", abiC, user1);
+    TokenD = new ethers.Contract("0x7aAE0b58df51A346182a11294e4Af42EEB3dA4c0", abiD, user1);
 
     const wArtifcat = await hre.artifacts.readArtifact("ercWrapper");
     const wAbi = wArtifcat.abi;
-    ErcWrapper = new ethers.Contract("0x468a4D465cb4693306359d0D1bFE0A8E8337ba42", wAbi, user1);
+    ErcWrapper = new ethers.Contract("0x3Ce6d53686Fcc3b74b22Cbd27Da26EEc9d0bd281", wAbi, user1);
 
     /** Uncomment depending on what action with smart contract you want to perform */
 
     // await getTokens();
     // await getBalance();
-    await wrapMock();
+    // await wrapMock();
     // await wrapBalance();
     // await transferWrap();
     // await unwrapTransfered();
@@ -64,10 +64,27 @@ async function main(): Promise<void> {
     // await fillOrderBasket();
     // await cancelOrderBasket();
 
+    async function createOrderBasket() {
+        const premium = ethers.utils.parseEther("0.09");
+        ErcWrapper.createOrder(1, premium);
+        // This needs to inform about price somehow
+    }
+
+    async function fillOrderBasket() {
+        const value = ethers.utils.parseEther("1");
+        ErcWrapper.fillOrder(user1.address, 1, {value});
+    }
+
+    async function cancelOrderBasket() {
+        ErcWrapper.cancelOrder(user1.address, 1);
+    }
+
     async function getTokens() {
         const value = ethers.utils.parseEther("0.01");
         await TokenA.deposit({ value });
         await TokenB.deposit({ value });
+        await TokenC.deposit({ value });
+        await TokenD.deposit({ value });
         console.log("tokA and tokB transfered to user1");
     }
 
@@ -77,16 +94,19 @@ async function main(): Promise<void> {
     }
 
     async function wrapMock() {
-        const toSwap = ethers.utils.parseEther("0.1");
+        const toSwap = ethers.utils.parseEther("69");
 
         // Approve two tokens which will become NFT-Index
         await TokenA.approve(ErcWrapper.address, toSwap);
         await TokenB.approve(ErcWrapper.address, toSwap);
+        await TokenC.approve(ErcWrapper.address, toSwap);
+        await TokenD.approve(ErcWrapper.address, toSwap);
         console.log("Tokens approved");
     
         // Send to contract
-        await ErcWrapper.wrapper([TokenA.address, TokenB.address], [toSwap, toSwap]);
+        const tx = await ErcWrapper.wrapper([TokenA.address, TokenB.address, TokenC.address, TokenD.address], [toSwap, toSwap, toSwap, toSwap]);
         console.log(user1.address, "created wrap!");
+        console.log(tx);
     }
 
     async function transferWrap() {
@@ -97,7 +117,7 @@ async function main(): Promise<void> {
     }
 
     async function unwrapTransfered() {
-        let user2_wrapper = new ethers.Contract("0x1F6cF4780540D2E829964d0851146feaeA686827", wAbi, user2);
+        let user2_wrapper = new ethers.Contract("0x3163B20A6d9E846728a6dA06D3a4C98BF5a6E6f3", wAbi, user2);
         const tx = await user2_wrapper.unwrapper(1);
         console.log("wrap unwrapped");
         console.log(tx);

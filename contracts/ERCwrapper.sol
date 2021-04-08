@@ -64,11 +64,15 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
     }
 
     constructor(address[] memory _tokens, address[] memory _feeds)
-        ERC721("WrappedIndex", "WRAP")
+        ERC721("Basketz", "BWRAP")
         Whitelist(_tokens, _feeds)
     {
         backend = msg.sender;
     }
+
+    receive() external payable {}
+
+    fallback() external payable {}
 
     // :::::NOTE:::::
     // Onchain (can be expensive, at least one loop)
@@ -76,18 +80,13 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
     // An ideal would be to allow ALL ERC20 and let market price it, but that's not happening :)
 
     /** Wrapping and unwrapping of ERC20<=>ERC721 */
-    function wrapper(address[] memory tokens, uint256[] memory amounts) external returns (uint256) {
+    function wrapper(address[] memory tokens, uint256[] memory amounts) external {
         uint256 basketSize = tokens.length;
         require(basketSize <= 10, "Maxiumum  Basket size allowed");
 
-        // This is for sure not an optimal solution
         for (uint256 i = 0; i < tokens.length; i++) {
-            bool success = isAllowed(tokens[i]);
-            require(success, "No Chainlink Price Feed Available");
-        }
-
-        for (uint256 i = 0; i < tokens.length; i++) {
-            // NOTE: Refund if some token transfer failed
+            bool allowedToken = isAllowed(tokens[i]);
+            require(allowedToken, "No Chainlink Price Feed Available");
             bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
             require(success, "Transfer failed");
         }
@@ -99,23 +98,6 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         // NOTE: URI. Off-chain stats, lightweight analysis of basket price change, volatility grade, dashboard for portfolio etc.
 
         // emit BasketCreated(msg.sender, wrapId, tokens, amounts);
-        return wrapId;
-    }
-
-    function wrapperBackend(address[] memory tokens, uint256[] memory amounts) public backEnd returns (uint256) {
-        // NOTE: No need to check, but introduces additional role of backEnd script
-        uint256 basketSize = tokens.length;
-        require(basketSize <= 10, "Maxiumum  Basket size allowed");
-        for (uint256 i = 0; i < tokens.length; i++) {
-            // NOTE: Refund if some token transfer failed
-            bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
-            require(success, "Transfer failed");
-        }
-        _wrapID.increment();
-        uint256 wrapId = _wrapID.current();
-        wrapped[msg.sender][wrapId] = UserIndex({ tokens: tokens, amounts: amounts, locked: false });
-        _mint(msg.sender, wrapId);
-        return wrapId;
     }
 
     function unwrapper(uint256 _wrapId) public {
@@ -215,7 +197,6 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         require(bidding[msg.sender][_wrapId].onSale == false, "Basket already listed");
         wrapped[msg.sender][_wrapId].locked = true; // Cannot transfer & Unwrap now
-
         // priceBasket functions on-chain is expensive, chainlink price feed can be used off-chain
         uint256 _priceBasket = priceBasket(_wrapId);
         uint256 price = _priceBasket.add(_premium);
