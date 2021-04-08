@@ -29,21 +29,24 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
     Counters.Counter private _wrapID;
     AggregatorV3Interface internal priceFeed;
 
-    // // Event for wrapper
-    // event BasketCreated(address owner, uint256 wrapId, address[] tokens, uint256[] amounts);
-    // // Event for unwrapper
-    // event BasketUnwraped(address owner, uint256 wrapId);
+    // Event for wrapper
+    event BasketCreated(address owner, uint256 wrapId, address[] tokens, uint256[] amounts);
 
-    // // Event for createOrder
-    // event OrderCreated(address owner, uint256 wrapId, uint256 price, uint256 premium);
+    // Event for unwrapper
+    event BasketUnwraped(address owner, uint256 wrapId);
 
-    // // Event for fillOrder
-    // event OrderFilled(address owner, address newOwner, uint256 wrapId);
+    // Event for createOrder
+    event OrderCreated(address owner, uint256 wrapId, uint256 price, uint256 premium);
 
-    // // Event for cancelOrder
-    // event OrderCancelled(address owner, uint256 wrapId);
+    // Event for priceBasket
+    event BasketPrice(uint256 _wrapId, uint256 total);
 
-    address private backend;
+    // Event for fillOrder
+    event OrderFilled(address owner, address newOwner, uint256 wrapId);
+
+    // Event for cancelOrder
+    event OrderCancelled(address owner, uint256 wrapId);
+
     mapping(address => mapping(uint256 => UserIndex)) public wrapped;
     mapping(address => mapping(uint256 => Bid)) public bidding;
 
@@ -58,17 +61,10 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         bool onSale;
     }
 
-    modifier backEnd() {
-        require(msg.sender == backend, "Pre-checked whitelist tokens");
-        _;
-    }
-
     constructor(address[] memory _tokens, address[] memory _feeds)
         ERC721("Basketz", "BWRAP")
         Whitelist(_tokens, _feeds)
-    {
-        backend = msg.sender;
-    }
+    {}
 
     receive() external payable {}
 
@@ -81,14 +77,11 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
 
     /** Wrapping and unwrapping of ERC20<=>ERC721 */
     function wrapper(address[] memory tokens, uint256[] memory amounts) external {
-        uint256 basketSize = tokens.length;
-        require(basketSize <= 10, "Maxiumum  Basket size allowed");
-
         for (uint256 i = 0; i < tokens.length; i++) {
             bool allowedToken = isAllowed(tokens[i]);
             require(allowedToken, "No Chainlink Price Feed Available");
-            bool success = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
-            require(success, "Transfer failed");
+            bool transferSuccess = IERC20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
+            require(transferSuccess, "Transfer failed");
         }
 
         _wrapID.increment();
@@ -97,7 +90,7 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         _mint(msg.sender, wrapId);
         // NOTE: URI. Off-chain stats, lightweight analysis of basket price change, volatility grade, dashboard for portfolio etc.
 
-        // emit BasketCreated(msg.sender, wrapId, tokens, amounts);
+        emit BasketCreated(msg.sender, wrapId, tokens, amounts);
     }
 
     function unwrapper(uint256 _wrapId) public {
@@ -120,7 +113,7 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
 
         delete wrapped[msg.sender][_wrapId];
         _burn(_wrapId);
-        // emit BasketUnwraped(msg.sender, _wrapId);
+        emit BasketUnwraped(msg.sender, _wrapId);
     }
 
     function _transfer(
@@ -131,8 +124,7 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         require(wrapped[from][_wrapId].locked == false, "Cannot transfer locked");
         wrapped[to][_wrapId] = wrapped[from][_wrapId];
         super._transfer(from, to, _wrapId);
-        // NOTE: Change Basket ownership with NFT transfer (token claim/unwrap)
-        delete wrapped[from][_wrapId]; // could check if swap and then only lock/unlock
+        delete wrapped[from][_wrapId];
     }
 
     /** Swaping with HTLC */
@@ -192,16 +184,15 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         currently is setting of _premium over basket price.
      */
 
-    // NOTE: PriceSlip guard would allow tokens to be canceled less. Just don't execute order below certain price, wait for upswing
     function createOrder(uint256 _wrapId, uint256 _premium) external {
         require(ERC721.ownerOf(_wrapId) == msg.sender, "Not an owner of a basket");
         require(bidding[msg.sender][_wrapId].onSale == false, "Basket already listed");
         wrapped[msg.sender][_wrapId].locked = true; // Cannot transfer & Unwrap now
-        // priceBasket functions on-chain is expensive, chainlink price feed can be used off-chain
+        // NOTE: priceBasket functions on-chain is expensive, chainlink price feed can be used off-chain
         uint256 _priceBasket = priceBasket(_wrapId);
         uint256 price = _priceBasket.add(_premium);
         bidding[msg.sender][_wrapId] = Bid({ price: price, onSale: true });
-        // emit OrderCreated(msg.sender, _wrapId, price, _premium);
+        emit OrderCreated(msg.sender, _wrapId, price, _premium);
     }
 
     function fillOrder(address payable _owner, uint256 _wrapId) public payable {
@@ -213,7 +204,7 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         super._transfer(_owner, msg.sender, _wrapId);
         wrapped[msg.sender][_wrapId] = wrapped[_owner][_wrapId];
         delete wrapped[_owner][_wrapId];
-        // emit OrderFilled(_owner, msg.sender, _wrapId);
+        emit OrderFilled(_owner, msg.sender, _wrapId);
     }
 
     function cancelOrder(uint256 _wrapId) public {
@@ -222,7 +213,7 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         require(wrapped[msg.sender][_wrapId].locked == true, "Not for sale");
         delete bidding[msg.sender][_wrapId];
         wrapped[msg.sender][_wrapId].locked = false;
-        // emit OrderCancelled(msg.sender, _wrapId);
+        emit OrderCancelled(msg.sender, _wrapId);
     }
 
     function priceBasket(uint256 _wrapId) public returns (uint256) {
@@ -230,14 +221,14 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         uint256 total;
         for (uint256 i = 0; i < wrapped[msg.sender][_wrapId].tokens.length; i++) {
             address feed = getMember(wrapped[msg.sender][_wrapId].tokens[i]);
-            priceFeed = AggregatorV3Interface(feed); // feed is correct, checked with getMember
+            priceFeed = AggregatorV3Interface(feed);
             // NOTE: This means chainlink gets price on-chain, should be moved off chain
             // NOTE: This also makes BasicTests fail because you can get price only from rinkeby and not local hardhat
-            // int256 price = MockLinkFeed(priceUpdate);
             (uint80 roundID, int256 price, uint256 startedAt, uint256 timeStamp, uint80 answeredInRound) =
                 priceFeed.latestRoundData();
             total = total.add(uint256(price));
         }
+        emit BasketPrice(_wrapId, total);
         return total;
     }
 
@@ -248,16 +239,6 @@ contract ercWrapper is ERC721, Whitelist, ControlHTLC {
         uint256 price = _priceBasket.add(_premium);
         bidding[msg.sender][_wrapId].price = price;
         return price;
-    }
-
-    function MockLinkFeed(bool update) public pure returns (int256) {
-        if (update == true) {
-            int256 value = 33333;
-            return (value);
-        } else {
-            int256 value = 66666;
-            return (value);
-        }
     }
 
     /** View functions for wrap and bidding */
