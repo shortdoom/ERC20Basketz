@@ -1,22 +1,17 @@
 import { ethers } from "hardhat";
-import { Contract, ContractFactory } from "ethers";
+import { Contract } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 const hre = require("hardhat");
 
 var fs = require("fs");
 
 /**
- * Wrapper deployed to:  0x3Ce6d53686Fcc3b74b22Cbd27Da26EEc9d0bd281
+ * Wrapper deployed to:  0xac92c3eCEF51276f8F9154e94A55103D2341dE0A
  * Deployer address 0xc3f8e4bC305dcaAbd410b220E0734d4DeA7C0bc9
-  SNX tokA: 0x468C26d86c614cC3d8Eb8cFd89D5607f79D46289
-  ZRX tokB: 0x9C35eb2Ddf340AD3ac051455ea26D44e1ed87DC9
-  BAT tokC: 0x1F6cF4780540D2E829964d0851146feaeA686827
-  LINK tokD: 0x7aAE0b58df51A346182a11294e4Af42EEB3dA4c0
- * Todo:
- *      Name Mocks Differently (shadow real rinkebyOracle names tSNX)
- *      Verified Contract for ease
- *      Load testLink and change Oracle output (now it's hardcoded bullshit value)
- *      Better structure of rinkebyInteract for multiple use (split functions)
+ * SNX tokA: 0x468C26d86c614cC3d8Eb8cFd89D5607f79D46289
+ * ZRX tokB: 0x9C35eb2Ddf340AD3ac051455ea26D44e1ed87DC9
+ * BAT tokC: 0x1F6cF4780540D2E829964d0851146feaeA686827
+ * LINK tokD: 0x7aAE0b58df51A346182a11294e4Af42EEB3dA4c0
  */
 
 async function main(): Promise<void> {
@@ -49,13 +44,13 @@ async function main(): Promise<void> {
 
     const wArtifcat = await hre.artifacts.readArtifact("ercWrapper");
     const wAbi = wArtifcat.abi;
-    ErcWrapper = new ethers.Contract("0x3Ce6d53686Fcc3b74b22Cbd27Da26EEc9d0bd281", wAbi, user1);
+    ErcWrapper = new ethers.Contract("0xac92c3eCEF51276f8F9154e94A55103D2341dE0A", wAbi, user1);
 
     /** Uncomment depending on what action with smart contract you want to perform */
 
     // await getTokens();
     // await getBalance();
-    // await wrapMock();
+    await wrapMock();
     // await wrapBalance();
     // await transferWrap();
     // await unwrapTransfered();
@@ -67,7 +62,6 @@ async function main(): Promise<void> {
     async function createOrderBasket() {
         const premium = ethers.utils.parseEther("0.09");
         ErcWrapper.createOrder(1, premium);
-        // This needs to inform about price somehow
     }
 
     async function fillOrderBasket() {
@@ -94,7 +88,7 @@ async function main(): Promise<void> {
     }
 
     async function wrapMock() {
-        const toSwap = ethers.utils.parseEther("69");
+        const toSwap = ethers.utils.parseEther("19");
 
         // Approve two tokens which will become NFT-Index
         await TokenA.approve(ErcWrapper.address, toSwap);
