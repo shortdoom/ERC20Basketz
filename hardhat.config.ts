@@ -55,7 +55,7 @@ function createTestnetConfig(network: keyof typeof chainIds): NetworkUserConfig 
 }
 
 const config: HardhatUserConfig = {
-  defaultNetwork: "kovan",
+  defaultNetwork: "matic",
   networks: {
     hardhat: {
       accounts: {
@@ -67,6 +67,12 @@ const config: HardhatUserConfig = {
     kovan: createTestnetConfig("kovan"),
     rinkeby: createTestnetConfig("rinkeby"),
     ropsten: createTestnetConfig("ropsten"),
+    matic: {
+      url: "https://rpc-mumbai.maticvigil.com/",
+      accounts: {
+        mnemonic,
+      },
+    },
   },
   paths: {
     artifacts: "./artifacts",

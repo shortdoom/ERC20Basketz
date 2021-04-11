@@ -8,8 +8,8 @@ var fs = require("fs");
 const TOTALSUPPLY = ethers.utils.parseEther("10000");
 
 /**
- * Wrapper deployed to:  0xac92c3eCEF51276f8F9154e94A55103D2341dE0A
- * Deployer address 0xc3f8e4bC305dcaAbd410b220E0734d4DeA7C0bc9
+  Wrapper deployed to:  0x1F6cF4780540D2E829964d0851146feaeA686827
+  Deployer address 0xc3f8e4bC305dcaAbd410b220E0734d4DeA7C0bc9
  * npx hardhat verify --network kovan --constructor-args scripts/arguments.js 0xac92c3eCEF51276f8F9154e94A55103D2341dE0A
  * https://kovan.etherscan.io/address/0xac92c3eCEF51276f8F9154e94A55103D2341dE0A#code
  */

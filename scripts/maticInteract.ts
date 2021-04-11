@@ -37,20 +37,20 @@ async function main(): Promise<void> {
     const abiC = artifactC.abi;
     const abiD = artifactD.abi;
 
-    TokenA = new ethers.Contract("0x468C26d86c614cC3d8Eb8cFd89D5607f79D46289", abiA, user1);
-    TokenB = new ethers.Contract("0x9C35eb2Ddf340AD3ac051455ea26D44e1ed87DC9", abiB, user1);
-    TokenC = new ethers.Contract("0x1F6cF4780540D2E829964d0851146feaeA686827", abiC, user1);
-    TokenD = new ethers.Contract("0x7aAE0b58df51A346182a11294e4Af42EEB3dA4c0", abiD, user1);
+    TokenA = new ethers.Contract("0x585477b415Ea1Bc88ABcA26c32755952CF24C631", abiA, user1);
+    TokenB = new ethers.Contract("0xa30000D7B0B6b645FAAB3931C02320649f6Bee23", abiB, user1);
+    TokenC = new ethers.Contract("0x468C26d86c614cC3d8Eb8cFd89D5607f79D46289", abiC, user1);
+    TokenD = new ethers.Contract("0x9C35eb2Ddf340AD3ac051455ea26D44e1ed87DC9", abiD, user1);
 
     const wArtifcat = await hre.artifacts.readArtifact("ercWrapper");
     const wAbi = wArtifcat.abi;
-    ErcWrapper = new ethers.Contract("0xac92c3eCEF51276f8F9154e94A55103D2341dE0A", wAbi, user1);
+    ErcWrapper = new ethers.Contract("0x1F6cF4780540D2E829964d0851146feaeA686827", wAbi, user1);
 
     /** Uncomment depending on what action with smart contract you want to perform */
 
-    // await getTokens();
-    // await getBalance();
-    await wrapMock();
+    await getTokens();
+    await getBalance();
+    // await wrapMock();
     // await wrapBalance();
     // await transferWrap();
     // await unwrapTransfered();

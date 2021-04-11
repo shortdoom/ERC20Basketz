@@ -12,11 +12,11 @@ import { MockTokenD__factory } from "../typechain";
  * Get token using testnet ETH by calling deposit(). Exchange ETH at rate 0.01>n = 1000 Tokens.
  * Tokens are whitelisted in myContract.
  * PRICE FEEDS FOR SNX, ZRX, BAT, LINK
-  SNX tokA: 0x468C26d86c614cC3d8Eb8cFd89D5607f79D46289
-  ZRX tokB: 0x9C35eb2Ddf340AD3ac051455ea26D44e1ed87DC9
-  BAT tokC: 0x1F6cF4780540D2E829964d0851146feaeA686827
-  LINK tokD: 0x7aAE0b58df51A346182a11294e4Af42EEB3dA4c0
-   npx hardhat verify --network kovan --contract contracts/tokenMock/TokenD.sol:MockTokenD 0x7aAE0b58df51A346182a11294e4Af42EEB3dA4c0
+  SNX tokA: 0x585477b415Ea1Bc88ABcA26c32755952CF24C631
+  ZRX tokB: 0xa30000D7B0B6b645FAAB3931C02320649f6Bee23
+  BAT tokC: 0x468C26d86c614cC3d8Eb8cFd89D5607f79D46289
+  LINK tokD: 0x9C35eb2Ddf340AD3ac051455ea26D44e1ed87DC9
+  npx hardhat verify --network kovan --contract contracts/tokenMock/TokenD.sol:MockTokenD 0x7aAE0b58df51A346182a11294e4Af42EEB3dA4c0
  * 
  */
 
