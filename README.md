@@ -6,21 +6,34 @@ Wrap your ERC20 tokens in an ERC721 basket to transfer, swap, sell and more...
 
 * Wrap and unwrap ERC20 Baskets, store any allowed ERC20 as one NFT.
 
-* Compose analytics of a basket (price change, volatility, performance) and return it as NFT metadata.
-
-* Ability to transfer ERC20 Baskets as NFT.
+* Ability to transfer ERC20 Baskets as NFT in one transaction.
 
 * Use `hashed-timelock-contract` [[HTLC]](https://github.com/ConsenSys/hashed-timelock-contract-ethereum) to swap basket <> basket without 3rd party involvement.
 
-* Sell or auction your Basket for ETH.
+* Auction your Basket for ETH.
 
-* Performance dashboard held as NFT metadata
-
-*More to come...*
+![Contract diagram](contract_flow.png)
 
 ### Deployment data
 
-All contracts can be found on kovan network. 
+Contract is deployed on Matic Network. ABI data can be found in folder `contracts/abis`.
+
+Testnet Matic network however has very limited amount of available [Chainlink price feeds](https://docs.chain.link/docs/matic-addresses), we are using ones defined in parentheses.
+
+ * Wrapper deployed to: 0x1F6cF4780540D2E829964d0851146feaeA686827
+
+ * Deployer address 0xc3f8e4bC305dcaAbd410b220E0734d4DeA7C0bc9
+
+ * (DAI feed) tokA: 0x585477b415Ea1Bc88ABcA26c32755952CF24C631
+
+ * (MATIC feed) tokB: 0xa30000D7B0B6b645FAAB3931C02320649f6Bee23
+
+ * (USDC feed) tokC: 0x468C26d86c614cC3d8Eb8cFd89D5607f79D46289
+
+ * (USDT feed) tokD: 0x9C35eb2Ddf340AD3ac051455ea26D44e1ed87DC9
+
+
+Contracts can be also found on a Kovan Network.
 
 SNX tokA means that contract is using SNX/ETH Chainlink price feed for a tokA mock contract. 
 
@@ -36,9 +49,6 @@ SNX tokA means that contract is using SNX/ETH Chainlink price feed for a tokA mo
 
  * LINK tokD: 0x7aAE0b58df51A346182a11294e4Af42EEB3dA4c0
 
- ABI data can be found in folder `contracts/abis`
-
-
 ### Why this is cool?
 
 * You can now batch transfer your ERC20 as ERC721.
@@ -51,9 +61,6 @@ SNX tokA means that contract is using SNX/ETH Chainlink price feed for a tokA mo
 
 1) Users creates a **wrap** by sending tokens *(min. 2, max. 10)* to `wrapper()` function.
 2) Contract checks if tokens are whitelisted for wrapping. (Avoid low liquidity and unverified tokens!)
-
-    2a) *Function wrappedBackend is a placeholder for a possible change of development path and doing whitelisting offchain.*
-
 3) User **mints** NFT token corresponding to transferred tokens (tokens balance held in mapping `wrapped`).
 4) User can **unwrap** NFT he owns back to his ERC20 tokens.
 5) User can **transfer** NFT and ownership with claim on wrapped Tokens.
@@ -61,9 +68,26 @@ SNX tokA means that contract is using SNX/ETH Chainlink price feed for a tokA mo
 7) User can check the balance of his basket using `wrappedBalance()`.
 8) Contract uses Chainlink ethereum price feeds to calculate a value of the Basket.
 
-### Chainlink price feeds role
+### Motivation
 
-***NOTE FOR PRE-ALPHA VERSION***: *Currently contract performs all Link related actions on-chain which is not the most optimal solution gas-wise. A large part of operations involving price tracking of a baskets and facilitating p2p exchange will be made by an off-chain scripts*
+We want to allow users to create personal indexes of tokens with sufficient underlying liquidity for easy trading and swapping between. The main benefit for the users is instant entry and exit into multiple tokens inside of a one transaction. This not only saves gas costs but also allows for formation of better trading strategies and arbitrage driven by a demand for more than one tokens (ie. Basket composed only of DEX-related tokens).
+
+Given limited time and small team of two people, there are numerous improvements we wanted to introduce which may find its way into final (production) version of a protocol, e.g
+
+* Use of TheGraph protocol for handling of events.
+
+* Utilizing ERC721 metadata for additional features and financial calculations related to basket composition.
+
+* Creation of a more liquid trading system, outside of currently proposed direct bidding.
+
+* IPFS hosting for the whole protocol.
+
+* Lending & Staking platform against user composed baskets.
+
+* Fiat on-ramp to easily buy-in into multiple positions.
+
+
+### Chainlink price feeds role
 
 **Basket creation**
 
@@ -78,6 +102,8 @@ Because the contract allows swaps and selling of a basket we need to know the re
 ![Gas used in tests](gas_cost.png)
 
 ### Tests output
+
+Local tests will fail on order related operations because of inaccessible chainlink price feeds. However, contract was tested with mock-up price feeds before actual deployment.
 
 ````html
   ErcWrapper
@@ -123,24 +149,6 @@ Because the contract allows swaps and selling of a basket we need to know the re
     ✓ Check balances
     ✓ Check Basket ownership after swap
 ````
-
-### To-do
-
-0. Security. Currently it's just a PoC.
-1. Create a backend API server and connect it to ERC721 metadata.
-2. Use ERC721 metadata to facilitate selling of baskets for ETH while keeping gas costs low.
-3. Backend matching script for selling of baskets for ETH.
-4. Create UI, duh.
-5. Currently we only check for most basic cases in tests (29 tests in total). Write more tests.
-7. Access control, access control, access control.
-6. Add ability for loaning against the basket! (A very big overhead for a solo project, but doable).
-8. Deployment scripts are just scaffold for the time being.
-
-### Pre-alpha general notes
-
-1. Currently we load `tokens.txt` and `feeds.txt` to execute a contract with `Whitelist.sol` enabled. Those files will hold mainnet tokens addresses and Chainlink feeds corresponding to those addresses.
-2. Bidding mechanism will be moved off-chain in a big part to save gas costs.
-3. `MockLinkFeed()` is a placeholder function to check if the price is updated.
 
 ## How to run
 
