@@ -12,7 +12,7 @@ Wrap your ERC20 tokens in an ERC721 basket to transfer, swap, sell and more...
 
 * Auction your Basket for ETH.
 
-![Contract diagram](contract_flow.png)
+![Contract diagram](contract_flow.jpg)
 
 ### Deployment data
 
