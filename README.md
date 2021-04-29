@@ -2,6 +2,8 @@
 
 Wrap your ERC20 tokens in an ERC721 basket to transfer, swap, sell and more...
 
+[Project won Grand Prize in Chainlink 2021 Spring Hackathon!](https://devpost.com/software/wrappedbasketz)
+
 ### Breakdown of contract functions
 
 * Wrap and unwrap ERC20 Baskets, store any allowed ERC20 as one NFT.
