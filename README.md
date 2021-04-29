@@ -2,7 +2,7 @@
 
 Wrap your ERC20 tokens in an ERC721 basket to transfer, swap, sell and more...
 
-[Project won Grand Prize in Chainlink 2021 Spring Hackathon!](https://devpost.com/software/wrappedbasketz)
+[Project won Grand Prize in Chainlink 2021 Spring Hackathon - Polygon Category!](https://devpost.com/software/wrappedbasketz)
 
 ### Breakdown of contract functions
 
